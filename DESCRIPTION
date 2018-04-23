@@ -17,3 +17,5 @@ Suggests:
     knitr,
     rmarkdown
 VignetteBuilder: knitr
+URL: https://github.com/mrc-ide/alphaepi
+BugReports: https://github.com/mrc-ide/alphaepi/issues
