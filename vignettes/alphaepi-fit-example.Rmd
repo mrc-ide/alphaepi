@@ -1,0 +1,63 @@
+---
+title: "Example of fitting incidence-mortality model"
+author: "Jeff Eaton"
+date: "`r Sys.Date()`"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Vignette Title}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+This vignette is a working document to illustrate the basic tools of the analysis.
+
+## Load data 
+
+Prepped cohort datasets are stored separately in the `alphaepisdata` package. Load this package to access the data sets.
+
+```{r load data}
+devtools::load_all("~/Documents/Code/R/alphaepisdata", export_all=FALSE)
+devtools::load_all()
+
+## Load individual, residences, and HIV tests datasets
+data(alpha_ind, alpha_res, alpha_hiv)
+
+hiv <- subset(alpha_hiv, type %in% c("survey", "self report") & !is.na(result) & !is.na(testdate))
+res <- alpha_res
+ind <- alpha_ind
+
+```
+
+The `prepare.stan.data()` function sets up stan input data for a model fit. Currently, 
+the function uses datasets from the global environment, among other greivances which 
+should be improved.
+
+```{r}
+rakaif_stand <- prepare.stan.data(c('Rakai', '1975prior451'), 'Female',
+                                  min.time=1970, max.time=2015, min.age=15, max.age=100,
+                                  natmxstart.time=1994, artstart.time=2004.5, cohortstart.time=1970, cohortend.time=2015,
+                                  pen.ord.incrate=1, pen.ord.natmx.time=1, pen.ord.natmx.age=1, pen.ord.art=1,
+                                  dt=0.2, k.dt=5, nk.art=5, hivonly=FALSE, hivelig=FALSE)
+```
+
+Call `rstan::sampling()` to fit the model. Usually, I run approximately 4 chains for 500 iterations. This is best done on a cluster.
+
+```{r, fit model}
+fit <- rstan::sampling(alphaepi::stanmodels$le_interact, data=rakaif_stand,
+                       iter=25, chains=1, chain_id=1, refresh=1)
+```
+
+The approach to analysis of model outputs is to create an output object and then
+call functions to analyse posterior outputs.
+
+```{r, model outputs}
+mod <- list(fit = fit, stand = rakaif_stand)
+mx_out <- add.mx(mod)
+```
