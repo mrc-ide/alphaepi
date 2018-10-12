@@ -36,6 +36,11 @@ convert.stan.params <- function(par, stand){
               coef_art = coef_art))
 }
 
+#' Create parameter list
+#'
+#' Convert stan parameter vectors and arrays into a list of length number of resamples.
+#' Each entry in the list is a single joint sample set for all parameters.
+#' 
 create.param.list <- function(stanfit){
   param <- rstan::extract(stanfit)
   param <- lapply(seq_along(param$lp__), function(ii) list(coef_incrate_time_age   = param$coef_incrate_time_age[ii,,],
