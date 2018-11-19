@@ -3,5 +3,5 @@
   for (m in modules) loadModule(m, what = TRUE)
 }
 .onAttach <- function(libname, pkgname){
-  rstan::expose_stan_functions(stanmodels$functions, as.environment("package:alphaepi"))
+##  rstan::expose_stan_functions(stanmodels$functions, envir = as.environment("package:alphaepi"))
 }
