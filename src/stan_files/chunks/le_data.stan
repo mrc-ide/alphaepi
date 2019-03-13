@@ -88,6 +88,14 @@
   // real hivsurv_shape;
   // vector[STEPS_age-1] hivsurv_scale_a0;
 
+  // Prior variance
+  real<lower=0> var_incrate_time_age;
+  real<lower=0> var_incrate_time;
+  real<lower=0> var_incrate_age;
+  real<lower=0> var_natmx_time;
+  real<lower=0> var_natmx_age;
+  real<lower=0> var_art;
+
 }
 transformed data {
 

@@ -68,7 +68,7 @@
     matrix[steps_dur, rows(scale_a0)] y;
     for(j in 1:rows(scale_a0)){
       for(i in 1:steps_dur)
-	y[i,j] = weibull_ccdf_log(i*dt-dt/2, shape, scale_a0[j]);
+	y[i,j] = weibull_lccdf(i*dt-dt/2 | shape, scale_a0[j]);
     }
     return y;
   }
