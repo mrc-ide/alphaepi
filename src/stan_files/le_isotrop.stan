@@ -57,8 +57,8 @@ model {
     vector[nk_incrate_time*nk_incrate_age] vec_coef_incrate_time_age;
 
     vec_coef_incrate_time_age = to_vector(coef_incrate_time_age);
-    increment_log_prob(-nk_incrate_time*nk_incrate_age*log(sigma_incrate_time_age) -
-		       1/(2*sigma_incrate_time_age*sigma_incrate_time_age) * (vec_coef_incrate_time_age' * Pcar_prec_incrate * vec_coef_incrate_time_age));
+    target += -nk_incrate_time*nk_incrate_age*log(sigma_incrate_time_age) -
+		       1/(2*sigma_incrate_time_age*sigma_incrate_time_age) * (vec_coef_incrate_time_age' * Pcar_prec_incrate * vec_coef_incrate_time_age);
     
     D_natmx_time * coef_natmx_time ~ normal(0, sigma_natmx_time);
     D_natmx_age * coef_natmx_age ~ normal(0, sigma_natmx_age);

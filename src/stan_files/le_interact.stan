@@ -50,12 +50,12 @@ model {
   //  Priors on variance terms  //
   ////////////////////////////////
 
-  sigma_incrate_time_age ~ cauchy(0, 2.5);
-  sigma_incrate_time ~ cauchy(0, 2.5);
-  sigma_incrate_age ~ cauchy(0, 2.5);
-  sigma_natmx_time ~ cauchy(0, 2.5);
-  sigma_natmx_age ~ cauchy(0, 2.5);
-  sigma_art ~ cauchy(0, 2.5);
+  sigma_incrate_time_age ~ cauchy(0, var_incrate_time_age);
+  sigma_incrate_time ~ cauchy(0, var_incrate_time);
+  sigma_incrate_age ~ cauchy(0, var_incrate_age);
+  sigma_natmx_time ~ cauchy(0, var_natmx_time);
+  sigma_natmx_age ~ cauchy(0, var_natmx_age);
+  sigma_art ~ cauchy(0, var_art);
 
   //////////////////////
   //  Spline penalty  //
@@ -70,8 +70,8 @@ model {
 	resid_incrate_time_age[i,j] = coef_incrate_time_age[i,j] - coef_incrate_time[i] - coef_incrate_age[j];
 
     vec_resid_incrate_time_age = to_vector(resid_incrate_time_age);
-    increment_log_prob(-(nk_incrate_time-1)*(nk_incrate_age-1)*log(sigma_incrate_time_age) -
-		       1/(2*sigma_incrate_time_age*sigma_incrate_time_age) * (vec_resid_incrate_time_age' * Pcar_prec_incrate * vec_resid_incrate_time_age));
+    target += -(nk_incrate_time-1)*(nk_incrate_age-1)*log(sigma_incrate_time_age) -
+		       1/(2*sigma_incrate_time_age*sigma_incrate_time_age) * (vec_resid_incrate_time_age' * Pcar_prec_incrate * vec_resid_incrate_time_age);
 
     D_incrate_time * coef_incrate_time ~ normal(0, sigma_incrate_time);
     D_incrate_age * to_vector(coef_incrate_age) ~ normal(0, sigma_incrate_age);
