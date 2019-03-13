@@ -35,7 +35,9 @@ prepare.stan.data <- function(sites = NULL, sexes = NULL, dat = NULL, dt = 0.1,
                               hivsurv.shape=2.0,
                               time.pen=TRUE, age.pen=TRUE, cohort.pen=FALSE,
                               pen.ord.incrate=1L, pen.ord.natmx.time=1L, pen.ord.natmx.age=1L, pen.ord.art=1L,
-                              nsamp=NULL, hivonly=FALSE, hivelig=FALSE){
+                              nsamp=NULL, hivonly=FALSE, hivelig=FALSE,
+                              var_incrate_time_age=2.5, var_incrate_time=2.5, var_incrate_age=2.5, 
+                              var_natmx_time=2.5, var_natmx_age=2.5, var_art=2.5){
 
   ## hivonly: if TRUE, only use HIV test data, don't use any residency episode data (no mortality).
   ## hivelig: indicates individuals only included if they have some HIV status information, so left truncate
@@ -255,6 +257,13 @@ prepare.stan.data <- function(sites = NULL, sexes = NULL, dat = NULL, dt = 0.1,
                     ## Xmid_art              = Xmid.art,
                     pen_ord_art           = pen.ord.art,
                     D_art                 = D_art,
+                    ## Variance of priors
+                    var_incrate_time_age  = var_incrate_time_age,
+                    var_incrate_time      = var_incrate_time,
+                    var_incrate_age       = var_incrate_age,
+                    var_natmx_time        = var_natmx_time,
+                    var_natmx_age         = var_natmx_age,
+                    var_art               = var_art,
                     ## HIV survival model
                     hivsurv_shape         = hivsurv.shape)
                     ## log_hivmx_dur_a0      = log_hivmx_dur_a0,
