@@ -93,44 +93,36 @@ prepare.stan.data <- function(sites = NULL, sexes = NULL, dat = NULL, dt = 0.1,
   STEPS_time=length(x.time)
   STEPS_age=length(x.age)
 
-  # x.age <- seq(min.ageTS*dt,max.ageTS*dt,by=dt/2) ## put into single mgcv call
   ## incidence model
   k.incrate.time <- k.dt*(floor(min.time / k.dt) - 3L):(ceiling(max.time / k.dt) + 3L)
   k.incrate.age <- k.dt*(floor(min.age / k.dt) - 3L):(ceiling(max.age / k.dt) + 3L)
 
   nk_incrate_time <- length(k.incrate.time)-4L
   nk_incrate_age <- length(k.incrate.age)-4L
-
-  ytemp1 <- rep(1,length(x.time))
-  ytemp2 <- rep(1, length(x.time[-1]-dt/2))
-  time_spline1 <- mgcv::jagam(ytemp ~ s(x.time,k=nk_incrate_time,bs="ps", m=c(2,pen.ord.incrate)),
-                              data=data.frame(x.time=x.time, ytemp = ytemp1),file=tempfile(),
-                              knots = list(x.time = k.incrate.time), centred=FALSE)[[1]]
-  time_spline2 <- mgcv::jagam(ytemp ~ s(x.time,k=nk_incrate_time,bs="ps", m=c(2,pen.ord.incrate)),
-                              data=data.frame(x.time=x.time[-1]-dt/2, ytemp = ytemp2),file=tempfile(),
-                              knots = list(x.time = k.incrate.time), centred=FALSE)[[1]]
   
-  ytemp3 <- rep(1,length(x.age))
-  ytemp4 <- rep(1, length(x.age[-1]-dt/2))
-  age_spline1 <- mgcv::jagam(ytemp ~ s(x.age,k=nk_incrate_age,bs="ps", m=c(2,pen.ord.incrate)),
-                            data=data.frame(x.age=x.age, ytemp = ytemp3),file=tempfile(),
-                            knots = list(x.age = k.incrate.age), centred=FALSE)[[1]]
-  age_spline2 <- mgcv::jagam(ytemp ~ s(x.age,k=nk_incrate_age,bs="ps", m=c(2,pen.ord.incrate)),
-                            data=data.frame(x.age=x.age[-1]-dt/2, ytemp = ytemp4),file=tempfile(),
-                            knots = list(x.age = k.incrate.age), centred=FALSE)[[1]]
+  x.alltime <- (min.timeTS*2):(max.timeTS*2)*(dt/2)
+  x.allage <- (min.ageTS*2):(max.ageTS*2)*(dt/2)
+  data_length <- max(length(x.alltime),length(x.allage))
+  ytemp <- rep(1,data_length)
+  inc_spline <- mgcv::jagam(ytemp ~ s(x.time, k=nk_incrate_time, bs="ps", m=c(2,pen.ord.incrate)) +
+                              s(x.age, k=nk_incrate_age, bs="ps", m=c(2,pen.ord.incrate)),
+                            data=data.frame(x.time = rep(x.alltime,length.out=data_length),
+                                            x.age = rep(x.allage,length.out=data_length), ytemp = ytemp),
+                            file=tempfile(), knots = list(x.time = k.incrate.time, x.age = k.incrate.age), 
+                            centred=FALSE)[[1]]
   
-  X_incrate_time <- time_spline1$X[,-1]
-  Xmid_incrate_time <- time_spline2$X[,-1]
-  X_incrate_age <- age_spline1$X[,-1]
-  Xmid_incrate_age <- age_spline2$X[,-1]
+  X_incrate_time <- inc_spline$X[which(1:length(x.alltime) %% 2!=0),2:(1+nk_incrate_time)]
+  Xmid_incrate_time <- inc_spline$X[which(1:length(x.alltime) %% 2==0),2:(1+nk_incrate_time)]
+  X_incrate_age <- inc_spline$X[which(1:length(x.allage) %% 2!=0), (2+nk_incrate_time):(1+nk_incrate_time+nk_incrate_age)]
+  Xmid_incrate_age <- inc_spline$X[which(1:length(x.allage) %% 2==0),(2+nk_incrate_time):(1+nk_incrate_time+nk_incrate_age)]
   
   # X_incrate_time <- splines::splineDesign(k.incrate.time, x.time, outer.ok=TRUE)
   # Xmid_incrate_time <- splines::splineDesign(k.incrate.time, x.time[-1]-dt/2, outer.ok=TRUE)
   # X_incrate_age <- splines::splineDesign(k.incrate.age, x.age, outer.ok=TRUE)
   # Xmid_incrate_age <- splines::splineDesign(k.incrate.age, x.age[-1]-dt/2)
 
-  D_incrate_time <- time_spline1$smooth[[1]]$D
-  D_incrate_age <- age_spline1$smooth[[1]]$D
+  D_incrate_time <- inc_spline$smooth[[1]]$D
+  D_incrate_age <- inc_spline$smooth[[2]]$D
   
   # D_incrate_time <- diff(diag(nk_incrate_time), differences=pen.ord.incrate)
   # D_incrate_age <- diff(diag(nk_incrate_age), differences=pen.ord.incrate)
@@ -163,41 +155,32 @@ prepare.stan.data <- function(sites = NULL, sexes = NULL, dat = NULL, dt = 0.1,
   nk_natmx_time <- length(k.natmx.time)-4L
   nk_natmx_age <- length(k.natmx.age)-4L
   
-  ytemp1 <- rep(1,length(c(rep(x.natmx[1], natmxstart.tIDX-1L), x.natmx)))
-  ytemp2 <- rep(1, length(c(rep(x.natmx[1], natmxstart.tIDX-1L), x.natmx[-1]-dt/2)))
-  time_spline3 <- mgcv::jagam(ytemp ~ s(x.time,k=nk_natmx_time,bs="ps", m=c(2,pen.ord.natmx.time)),
-                              data=data.frame(x.time=c(rep(x.natmx[1], natmxstart.tIDX-1L), x.natmx), 
-                                              ytemp = ytemp1),file=tempfile(),
-                              knots = list(x.time = k.natmx.time), centred=FALSE)[[1]]
-  time_spline4 <- mgcv::jagam(ytemp ~ s(x.time,k=nk_natmx_time,bs="ps", m=c(2,pen.ord.natmx.time)),
-                              data=data.frame(x.time=c(rep(x.natmx[1], natmxstart.tIDX-1L), x.natmx[-1]-dt/2), 
-                                              ytemp = ytemp2),file=tempfile(),
-                              knots = list(x.time = k.natmx.time), centred=FALSE)[[1]]
-  
-  ytemp3 <- rep(1,length(x.age))
-  ytemp4 <- rep(1, length(x.age[-1]-dt/2))
-  age_spline3 <- mgcv::jagam(ytemp ~ s(x.age,k=nk_natmx_age,bs="ps", m=c(2,pen.ord.natmx.age)),
-                             data=data.frame(x.age=x.age, ytemp = ytemp3),file=tempfile(),
-                             knots = list(x.age = k.natmx.age), centred=FALSE)[[1]]
-  age_spline4 <- mgcv::jagam(ytemp ~ s(x.age,k=nk_natmx_age,bs="ps", m=c(2,pen.ord.natmx.age)),
-                             data=data.frame(x.age=x.age[-1]-dt/2, ytemp = ytemp4),file=tempfile(),
-                             knots = list(x.age = k.natmx.age), centred=FALSE)[[1]]
+  x.allnat <- (natmxstart.timeTS*2):(max.timeTS*2)*(dt/2)
+  x.time.natspline <- c(rep(x.allnat[1], natmxstart.tIDX-1L), x.allnat)
+  data_length <- max(length(x.time.natspline),length(x.allage))
+  ytemp <- rep(1,data_length)
+  natmx_spline <- mgcv::jagam(ytemp ~ s(x.time,k=nk_natmx_time,bs="ps", m=c(2,pen.ord.natmx.time)) +
+                                s(x.age,k=nk_natmx_age,bs="ps", m=c(2,pen.ord.natmx.age)),
+                              data=data.frame(x.time=rep(x.time.natspline,length.out=data_length), 
+                                              x.age = rep(x.allage,length.out=data_length),
+                                              ytemp = ytemp),file=tempfile(),
+                              knots = list(x.time = k.natmx.time, x.age = k.natmx.age), centred=FALSE)[[1]]
 
   # X_natmx_time <- splines::splineDesign(k.natmx.time, c(rep(x.natmx[1], natmxstart.tIDX-1L), x.natmx), outer.ok=TRUE)
   # Xmid_natmx_time <- splines::splineDesign(k.natmx.time, c(rep(x.natmx[1], natmxstart.tIDX-1L), x.natmx[-1]-dt/2))
   # X_natmx_age <- splines::splineDesign(k.natmx.age, x.age, outer.ok=TRUE)
   # Xmid_natmx_age <- splines::splineDesign(k.natmx.age, x.age[-1]-dt/2)
   
-  X_natmx_time <- time_spline3$X[,-1]
-  Xmid_natmx_time <- time_spline4$X[,-1]
-  X_natmx_age <- age_spline3$X[,-1]
-  Xmid_natmx_age <- age_spline4$X[,-1]
+  X_natmx_time <- natmx_spline$X[which(c(rep(TRUE,natmxstart.tIDX-1L),seq(natmxstart.tIDX,natmxstart.tIDX+length(x.allnat)-1) %% 2==0)), 2:(nk_natmx_time+1)]
+  Xmid_natmx_time <- natmx_spline$X[which(c(rep(TRUE,natmxstart.tIDX-1L),seq(natmxstart.tIDX,natmxstart.tIDX+length(x.allnat)-1) %% 2!=0)), 2:(nk_natmx_time+1)]
+  X_natmx_age <- natmx_spline$X[which(1:length(x.allage) %% 2!=0), (nk_natmx_time+2):(nk_natmx_time+nk_natmx_age+1)]
+  Xmid_natmx_age <- natmx_spline$X[which(1:length(x.allage) %% 2==0), (nk_natmx_time+2):(nk_natmx_time+nk_natmx_age+1)]
 
   # D_natmx_time<- diff(diag(nk_natmx_time), differences=pen.ord.natmx.time)
   # D_natmx_age <- diff(diag(nk_natmx_age), differences=pen.ord.natmx.age)
 
-  D_natmx_time <- time_spline3$smooth[[1]]$D
-  D_natmx_age <- age_spline3$smooth[[1]]$D
+  D_natmx_time <- natmx_spline$smooth[[1]]$D
+  D_natmx_age <- natmx_spline$smooth[[2]]$D
   
   ## ART model
 
