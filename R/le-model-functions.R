@@ -171,11 +171,11 @@ prepare.stan.data <- function(sites = NULL, sexes = NULL, dat = NULL, dt = 0.1,
   # X_natmx_age <- splines::splineDesign(k.natmx.age, x.age, outer.ok=TRUE)
   # Xmid_natmx_age <- splines::splineDesign(k.natmx.age, x.age[-1]-dt/2)
   
-  X_natmx_time <- natmx_spline$X[which(c(rep(TRUE,natmxstart.tIDX-1L),seq(natmxstart.tIDX,natmxstart.tIDX+length(x.allnat)-1) %% 2==0)), 2:(nk_natmx_time+1)]
-  Xmid_natmx_time <- natmx_spline$X[which(c(rep(TRUE,natmxstart.tIDX-1L),seq(natmxstart.tIDX,natmxstart.tIDX+length(x.allnat)-1) %% 2!=0)), 2:(nk_natmx_time+1)]
+  X_natmx_time <- natmx_spline$X[which(c(rep(TRUE,natmxstart.tIDX-1L),1:length(x.allnat) %% 2!=0)), 2:(nk_natmx_time+1)]
+  Xmid_natmx_time <- natmx_spline$X[which(c(rep(TRUE,natmxstart.tIDX-1L),1:length(x.allnat) %% 2==0)), 2:(nk_natmx_time+1)]
   X_natmx_age <- natmx_spline$X[which(1:length(x.allage) %% 2!=0), (nk_natmx_time+2):(nk_natmx_time+nk_natmx_age+1)]
   Xmid_natmx_age <- natmx_spline$X[which(1:length(x.allage) %% 2==0), (nk_natmx_time+2):(nk_natmx_time+nk_natmx_age+1)]
-
+  
   # D_natmx_time<- diff(diag(nk_natmx_time), differences=pen.ord.natmx.time)
   # D_natmx_age <- diff(diag(nk_natmx_age), differences=pen.ord.natmx.age)
 
