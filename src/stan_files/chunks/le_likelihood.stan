@@ -18,7 +18,9 @@
     matrix[STEPS_time-1, STEPS_age-1] hivsurv_dur_a0;   // sequenced [1:DUR, 1:STEPS_age]
     matrix[STEPS_time-1, STEPS_age-1] hivmxMID_dur_a0;   // sequenced [1:(STEPS_time-1), 1:STEPS_age]
     
-    incrateMID_time_age = exp(Xmid_incrate_time * coef_incrate_time_age * Xmid_incrate_age');
+    incrateMID_time_age = rep_matrix(1, STEPS_time-1, STEPS_age-1);
+    incrateMID_time_age[ , test_aIDX:(STEPS_age-1)] = exp(Xmid_incrate_time * coef_incrate_time_age * Xmid_incrate_age');
+    incrateMID_time_age[ , 1] = exp(Xmid_incrate_time * coef_incrate_time_young);
     cumavoid_time_age = exp(-dt*diagCumSum(incrateMID_time_age));
     cumavoidMID_time_age = block(cumavoid_time_age, 1, 1, STEPS_time-1, STEPS_age-1) .* exp(-dt/2*incrateMID_time_age);
     
