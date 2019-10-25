@@ -5,3 +5,4 @@ inst/doc
 .hpp
 .o
 .DS_Store
+.so
