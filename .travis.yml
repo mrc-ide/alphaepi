@@ -12,9 +12,8 @@ env:
 
 before_install:
   - mkdir -p ~/.R/
-  - echo CXX14FLAGS=-O3 -march=native -mtune=native -fPIC >> ~/.R/Makevars
-  - echo CXX14=g++ >> ~/.R/Makevars
-  - echo CXX14STD=-std=c++1y >> ~/.R/Makevars
+  - echo "CXX = `R CMD config CXX`" >> ~/.R/Makevars
+  - echo "CXXFLAGS = `R CMD config CXXFLAGS` -pedantic -g0" >> ~/.R/Makevars 
   - export CLANG_EXTRA_ARG=""
   - if [[ $CXX = "clang++" ]] ;  then export CLANG_EXTRA_ARG=" -Qunused-arguments -fcolor-diagnostics " ; fi
   - sed -i.bak "s/ g++/ ${CXX}${CLANG_EXTRA_ARG}/" ~/.R/Makevars
@@ -22,6 +21,11 @@ before_install:
 
 script: 
   - |
+    mkdir ~/.R
+    echo > ~/.R/Makevars
+    echo CXX14FLAGS=-O3 -march=native -mtune=native -fPIC >> ~/.R/Makevars
+    echo CXX14=g++ >> ~/.R/Makevars
+    echo CXX14STD=-std=c++1y >> ~/.R/Makevars
     travis_wait 42 R CMD build .
     travis_wait 59 R CMD check alphaepi*tar.gz
 
