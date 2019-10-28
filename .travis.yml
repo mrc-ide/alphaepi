@@ -21,11 +21,6 @@ before_install:
 
 script: 
   - |
-    mkdir ~/.R
-    echo > ~/.R/Makevars
-    echo CXX14FLAGS=-O3 -march=native -mtune=native -fPIC >> ~/.R/Makevars
-    echo CXX14=g++ >> ~/.R/Makevars
-    echo CXX14STD=-std=c++1y >> ~/.R/Makevars
     travis_wait 42 R CMD build .
     travis_wait 59 R CMD check alphaepi*tar.gz
 
