@@ -26,7 +26,7 @@ hivsurvhaz <- function(tao, a0, param){
                                    
 
 prepare.stan.data <- function(sites = NULL, sexes = NULL, dat = NULL, dt = 0.1,
-                              min.age = 15.0, max.age = 60.0,
+                              min.age = 15.0, max.age = 60.0, min.age.test = 15.0,
                               min.time = 1980.5, max.time = 2011.5,
                               natmxstart.time, artstart.time,
                               cohortstart.time=min.time, cohortend.time=max.time,
@@ -35,7 +35,9 @@ prepare.stan.data <- function(sites = NULL, sexes = NULL, dat = NULL, dt = 0.1,
                               hivsurv.shape=2.0,
                               time.pen=TRUE, age.pen=TRUE, cohort.pen=FALSE,
                               pen.ord.incrate=1L, pen.ord.natmx.time=1L, pen.ord.natmx.age=1L, pen.ord.art=1L,
-                              nsamp=NULL, hivonly=FALSE, hivelig=FALSE){
+                              nsamp=NULL, hivonly=FALSE, hivelig=FALSE,
+                              var_incrate_time_age=2.5, var_incrate_time=2.5, var_incrate_age=2.5, 
+                              var_natmx_time=2.5, var_natmx_age=2.5, var_art=2.5){
 
   ## hivonly: if TRUE, only use HIV test data, don't use any residency episode data (no mortality).
   ## hivelig: indicates individuals only included if they have some HIV status information, so left truncate
@@ -70,8 +72,10 @@ prepare.stan.data <- function(sites = NULL, sexes = NULL, dat = NULL, dt = 0.1,
   min.timeTS <- round(min.time / dt)
   max.timeTS <- round(max.time / dt)
   min.ageTS <- round(min.age / dt)
+  min.age.testTS <- round(min.age.test / dt)
   max.ageTS <- round(max.age / dt)
-
+  
+  test.aIDX <- as.integer(min.age.testTS - min.ageTS) + 1L
 
   artstart.timeTS <- round(artstart.time / dt)
   natmxstart.timeTS <- round(natmxstart.time / dt)
@@ -88,25 +92,44 @@ prepare.stan.data <- function(sites = NULL, sexes = NULL, dat = NULL, dt = 0.1,
 
   x.time <- min.timeTS:max.timeTS*dt
   x.age <- min.ageTS:max.ageTS*dt
+  x.inc.age <- min.age.testTS:max.ageTS*dt
   STEPS_time=length(x.time)
   STEPS_age=length(x.age)
-
+  STEPS_age_test = length(x.inc.age)
 
   ## incidence model
   k.incrate.time <- k.dt*(floor(min.time / k.dt) - 3L):(ceiling(max.time / k.dt) + 3L)
-  k.incrate.age <- k.dt*(floor(min.age / k.dt) - 3L):(ceiling(max.age / k.dt) + 3L)
+  k.incrate.age <- k.dt*(floor(min.age.test / k.dt) - 3L):(ceiling(max.age / k.dt) + 3L)
 
   nk_incrate_time <- length(k.incrate.time)-4L
   nk_incrate_age <- length(k.incrate.age)-4L
+  
+  x.alltime <- (min.timeTS*2):(max.timeTS*2)*(dt/2)
+  x.inc.allage <- (min.age.testTS*2):(max.ageTS*2)*(dt/2)
+  data_length <- max(length(x.alltime),length(x.inc.allage))
+  ytemp <- rep(1,data_length)
+  inc_spline <- mgcv::jagam(ytemp ~ s(x.time, k=nk_incrate_time, bs="ps", m=c(2,pen.ord.incrate)) +
+                              s(x.age, k=nk_incrate_age, bs="ps", m=c(2,pen.ord.incrate)),
+                            data=data.frame(x.time = rep(x.alltime,length.out=data_length),
+                                            x.age = rep(x.inc.allage,length.out=data_length), ytemp = ytemp),
+                            file=tempfile(), knots = list(x.time = k.incrate.time, x.age = k.incrate.age), 
+                            centred=FALSE)[[1]]
+  
+  X_incrate_time <- inc_spline$X[which(1:length(x.alltime) %% 2!=0),2:(1+nk_incrate_time)]
+  Xmid_incrate_time <- inc_spline$X[which(1:length(x.alltime) %% 2==0),2:(1+nk_incrate_time)]
+  X_incrate_age <- inc_spline$X[which(1:length(x.inc.allage) %% 2!=0), (2+nk_incrate_time):(1+nk_incrate_time+nk_incrate_age)]
+  Xmid_incrate_age <- inc_spline$X[which(1:length(x.inc.allage) %% 2==0),(2+nk_incrate_time):(1+nk_incrate_time+nk_incrate_age)]
+  
+  # X_incrate_time <- splines::splineDesign(k.incrate.time, x.time, outer.ok=TRUE)
+  # Xmid_incrate_time <- splines::splineDesign(k.incrate.time, x.time[-1]-dt/2, outer.ok=TRUE)
+  # X_incrate_age <- splines::splineDesign(k.incrate.age, x.age, outer.ok=TRUE)
+  # Xmid_incrate_age <- splines::splineDesign(k.incrate.age, x.age[-1]-dt/2)
 
-  X_incrate_time <- splines::splineDesign(k.incrate.time, x.time, outer.ok=TRUE)
-  Xmid_incrate_time <- splines::splineDesign(k.incrate.time, x.time[-1]-dt/2, outer.ok=TRUE)
-  X_incrate_age <- splines::splineDesign(k.incrate.age, x.age, outer.ok=TRUE)
-  Xmid_incrate_age <- splines::splineDesign(k.incrate.age, x.age[-1]-dt/2)
-
-  D_incrate_time <- diff(diag(nk_incrate_time), differences=pen.ord.incrate)
-  D_incrate_age <- diff(diag(nk_incrate_age), differences=pen.ord.incrate)
-
+  D_incrate_time <- inc_spline$smooth[[1]]$D
+  D_incrate_age <- inc_spline$smooth[[2]]$D
+  
+  # D_incrate_time <- diff(diag(nk_incrate_time), differences=pen.ord.incrate)
+  # D_incrate_age <- diff(diag(nk_incrate_age), differences=pen.ord.incrate)
 
   ## Create precision matrix for bivariate incrate smoothing
   Pcar_prec_incrate <- matrix(0, nk_incrate_time*nk_incrate_age, nk_incrate_time*nk_incrate_age)
@@ -131,19 +154,38 @@ prepare.stan.data <- function(sites = NULL, sexes = NULL, dat = NULL, dt = 0.1,
   x.natmx <- natmxstart.timeTS:max.timeTS*dt
 
   k.natmx.time <- k.dt*(floor(natmxstart.time / k.dt) - 3L):(ceiling(max.time / k.dt) + 3L)
-  k.natmx.age <- k.incrate.age
+  k.natmx.age <- k.dt*(floor(min.age / k.dt) - 3L):(ceiling(max.age / k.dt) + 3L)
 
   nk_natmx_time <- length(k.natmx.time)-4L
   nk_natmx_age <- length(k.natmx.age)-4L
+  
+  x.allnat <- (natmxstart.timeTS*2):(max.timeTS*2)*(dt/2)
+  x.time.natspline <- c(rep(x.allnat[1], natmxstart.tIDX-1L), x.allnat)
+  x.allage <- (min.ageTS*2):(max.ageTS*2)*(dt/2)
+  data_length <- max(length(x.time.natspline),length(x.allage))
+  ytemp <- rep(1,data_length)
+  natmx_spline <- mgcv::jagam(ytemp ~ s(x.time,k=nk_natmx_time,bs="ps", m=c(2,pen.ord.natmx.time)) +
+                                s(x.age,k=nk_natmx_age,bs="ps", m=c(2,pen.ord.natmx.age)),
+                              data=data.frame(x.time=rep(x.time.natspline,length.out=data_length), 
+                                              x.age = rep(x.allage,length.out=data_length),
+                                              ytemp = ytemp),file=tempfile(),
+                              knots = list(x.time = k.natmx.time, x.age = k.natmx.age), centred=FALSE)[[1]]
 
-  X_natmx_time <- splines::splineDesign(k.natmx.time, c(rep(x.natmx[1], natmxstart.tIDX-1L), x.natmx), outer.ok=TRUE)
-  Xmid_natmx_time <- splines::splineDesign(k.natmx.time, c(rep(x.natmx[1], natmxstart.tIDX-1L), x.natmx[-1]-dt/2))
-  X_natmx_age <- splines::splineDesign(k.natmx.age, x.age, outer.ok=TRUE)
-  Xmid_natmx_age <- splines::splineDesign(k.natmx.age, x.age[-1]-dt/2)
+  # X_natmx_time <- splines::splineDesign(k.natmx.time, c(rep(x.natmx[1], natmxstart.tIDX-1L), x.natmx), outer.ok=TRUE)
+  # Xmid_natmx_time <- splines::splineDesign(k.natmx.time, c(rep(x.natmx[1], natmxstart.tIDX-1L), x.natmx[-1]-dt/2))
+  # X_natmx_age <- splines::splineDesign(k.natmx.age, x.age, outer.ok=TRUE)
+  # Xmid_natmx_age <- splines::splineDesign(k.natmx.age, x.age[-1]-dt/2)
+  
+  X_natmx_time <- natmx_spline$X[which(c(rep(TRUE,natmxstart.tIDX-1L),1:length(x.allnat) %% 2!=0)), 2:(nk_natmx_time+1)]
+  Xmid_natmx_time <- natmx_spline$X[which(c(rep(TRUE,natmxstart.tIDX-1L),1:length(x.allnat) %% 2==0)), 2:(nk_natmx_time+1)]
+  X_natmx_age <- natmx_spline$X[which(1:length(x.allage) %% 2!=0), (nk_natmx_time+2):(nk_natmx_time+nk_natmx_age+1)]
+  Xmid_natmx_age <- natmx_spline$X[which(1:length(x.allage) %% 2==0), (nk_natmx_time+2):(nk_natmx_time+nk_natmx_age+1)]
+  
+  # D_natmx_time<- diff(diag(nk_natmx_time), differences=pen.ord.natmx.time)
+  # D_natmx_age <- diff(diag(nk_natmx_age), differences=pen.ord.natmx.age)
 
-  D_natmx_time<- diff(diag(nk_natmx_time), differences=pen.ord.natmx.time)
-  D_natmx_age <- diff(diag(nk_natmx_age), differences=pen.ord.natmx.age)
-
+  D_natmx_time <- natmx_spline$smooth[[1]]$D
+  D_natmx_age <- natmx_spline$smooth[[2]]$D
   
   ## ART model
 
@@ -175,7 +217,9 @@ prepare.stan.data <- function(sites = NULL, sexes = NULL, dat = NULL, dt = 0.1,
   stan.data <- list(dt                    = dt,
                     STEPS_time            = STEPS_time,
                     STEPS_age             = STEPS_age,
+                    STEPS_age_test        = STEPS_age_test,
                     artstart_tIDX         = artstart.tIDX,
+                    test_aIDX             = test.aIDX,
                     ## INDIVIDUAL DATA  ##
                     N                     = nrow(dat),
                     id                    = dat$id,
@@ -255,6 +299,13 @@ prepare.stan.data <- function(sites = NULL, sexes = NULL, dat = NULL, dt = 0.1,
                     ## Xmid_art              = Xmid.art,
                     pen_ord_art           = pen.ord.art,
                     D_art                 = D_art,
+                    ## Variance of priors
+                    var_incrate_time_age  = var_incrate_time_age,
+                    var_incrate_time      = var_incrate_time,
+                    var_incrate_age       = var_incrate_age,
+                    var_natmx_time        = var_natmx_time,
+                    var_natmx_age         = var_natmx_age,
+                    var_art               = var_art,
                     ## HIV survival model
                     hivsurv_shape         = hivsurv.shape)
                     ## log_hivmx_dur_a0      = log_hivmx_dur_a0,

@@ -8,6 +8,7 @@ parameters {
 
   // matrix[nk_incrate_time, nk_incrate_age] coef_incrate_time_age;
   vector[nk_incrate_time] coef_incrate_time;
+  vector[nk_incrate_time] coef_incrate_time_young;
   vector[nk_incrate_age-1] param_incrate_age;
   vector[nk_natmx_time] coef_natmx_time;
   vector[nk_natmx_age-1] param_natmx_age;
@@ -71,6 +72,8 @@ model {
 
     D_incrate_time * coef_incrate_time ~ normal(0, sigma_incrate_time);
     D_incrate_age * coef_incrate_age ~ normal(0, sigma_incrate_age);
+    
+    D_incrate_time * coef_incrate_time_young ~ normal(0, sigma_incrate_time); // DIFFERENT SIGMA FOR YOUNGS??
     
     D_natmx_time * coef_natmx_time ~ normal(0, sigma_natmx_time);
     D_natmx_age * coef_natmx_age ~ normal(0, sigma_natmx_age);

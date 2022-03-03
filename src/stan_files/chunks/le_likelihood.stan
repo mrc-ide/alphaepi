@@ -18,7 +18,9 @@
     matrix[STEPS_time-1, STEPS_age-1] hivsurv_dur_a0;   // sequenced [1:DUR, 1:STEPS_age]
     matrix[STEPS_time-1, STEPS_age-1] hivmxMID_dur_a0;   // sequenced [1:(STEPS_time-1), 1:STEPS_age]
     
-    incrateMID_time_age = exp(Xmid_incrate_time * coef_incrate_time_age * Xmid_incrate_age');
+    incrateMID_time_age = rep_matrix(1, STEPS_time-1, STEPS_age-1);
+    incrateMID_time_age[ , test_aIDX:(STEPS_age-1)] = exp(Xmid_incrate_time * coef_incrate_time_age * Xmid_incrate_age');
+    incrateMID_time_age[ , 1] = exp(Xmid_incrate_time * coef_incrate_time_young);
     cumavoid_time_age = exp(-dt*diagCumSum(incrateMID_time_age));
     cumavoidMID_time_age = block(cumavoid_time_age, 1, 1, STEPS_time-1, STEPS_age-1) .* exp(-dt/2*incrateMID_time_age);
     
@@ -46,12 +48,12 @@
     //  Calculate individual likelihood  //
     ///////////////////////////////////////
     
-    increment_log_prob(calc_ll_cohexit(coh_cIDX, coh_minexpose_tIDX, coh_maxexpose_tIDX, coh_nexit,
+    target += calc_ll_cohexit(coh_cIDX, coh_minexpose_tIDX, coh_maxexpose_tIDX, coh_nexit,
 				       exdat_tIDX, exdat_minexpose_tIDX, exdat_maxexpose_tIDX, exdat_ndat,
 				       aggr_exposestart_tIDX, aggr_exposeend_tIDX,
 				       aggr_death, aggr_deathinterv, aggr_deathinterv_DUR, aggr_hivpos, aggr_nrepl,
 				       cumavoid_time_age, cumavoidMID_time_age, incrateMID_time_age,
 				       hivsurv_dur_a0, hivmx_dur_a0, hivmxMID_dur_a0,
 				       artrr, artrr_MID, artstart_tIDX,
-				       natsurv_time_age, natmx_time_age, dt));
+				       natsurv_time_age, natmx_time_age, dt);
   }

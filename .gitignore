@@ -2,3 +2,7 @@ inst/doc
 .Rhistory
 .RData
 .Rproj.user
+.hpp
+.o
+.DS_Store
+.so

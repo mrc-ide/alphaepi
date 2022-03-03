@@ -7,6 +7,7 @@ data {
 parameters {
 
   matrix[nk_incrate_time, nk_incrate_age] coef_incrate_time_age;
+  vector[nk_incrate_time] coef_incrate_time_young;
   vector[nk_natmx_time] coef_natmx_time;
   vector[nk_natmx_age-1] param_natmx_age;
   vector<upper=0>[STEPS_time-artstart_tIDX] dt_log_artrr;
@@ -17,6 +18,9 @@ parameters {
   real<lower=0>  hivsurv_shape;
   real hivsurv_scale_b0_centered;
   real hivsurv_scale_b1_centered;
+  
+  real<lower=0> sigma_incrate_time;
+
 }
 transformed parameters{
 
@@ -48,6 +52,8 @@ model {
   sigma_natmx_time ~ cauchy(0, 2.5);
   sigma_natmx_age ~ cauchy(0, 2.5);
   sigma_art ~ cauchy(0, 2.5);
+  sigma_incrate_time ~ cauchy(0, 2.5);
+
 
   //////////////////////
   //  Spline penalty  //
@@ -57,8 +63,10 @@ model {
     vector[nk_incrate_time*nk_incrate_age] vec_coef_incrate_time_age;
 
     vec_coef_incrate_time_age = to_vector(coef_incrate_time_age);
-    increment_log_prob(-nk_incrate_time*nk_incrate_age*log(sigma_incrate_time_age) -
-		       1/(2*sigma_incrate_time_age*sigma_incrate_time_age) * (vec_coef_incrate_time_age' * Pcar_prec_incrate * vec_coef_incrate_time_age));
+    target += -nk_incrate_time*nk_incrate_age*log(sigma_incrate_time_age) -
+		       1/(2*sigma_incrate_time_age*sigma_incrate_time_age) * (vec_coef_incrate_time_age' * Pcar_prec_incrate * vec_coef_incrate_time_age);
+    
+    D_incrate_time * coef_incrate_time_young ~ normal(0, sigma_incrate_time); // DIFFERENT SIGMA FOR YOUNGS??
     
     D_natmx_time * coef_natmx_time ~ normal(0, sigma_natmx_time);
     D_natmx_age * coef_natmx_age ~ normal(0, sigma_natmx_age);

@@ -2,7 +2,9 @@
   real<lower=0> dt;
   int<lower=1> STEPS_time;
   int<lower=1> STEPS_age;
+  int<lower=1, upper=STEPS_age> STEPS_age_test;
   int<lower=1, upper=STEPS_time> artstart_tIDX;
+  int<lower=1, upper=STEPS_age> test_aIDX;
 
   vector[STEPS_time] x_time;
   vector[STEPS_age] x_age;
@@ -43,8 +45,8 @@
 
   matrix[STEPS_time, nk_incrate_time] X_incrate_time;
   matrix[STEPS_time-1, nk_incrate_time] Xmid_incrate_time;
-  matrix[STEPS_age, nk_incrate_age] X_incrate_age;
-  matrix[STEPS_age-1, nk_incrate_age] Xmid_incrate_age;
+  matrix[STEPS_age_test, nk_incrate_age] X_incrate_age;
+  matrix[STEPS_age_test-1, nk_incrate_age] Xmid_incrate_age;
 
   int<lower=0> pen_ord_incrate;
 
@@ -87,6 +89,14 @@
   // matrix[STEPS_time-1, STEPS_age-1] hivmxMID_dur_a0;   // sequenced [1:(STEPS_time-1), 1:STEPS_age]
   // real hivsurv_shape;
   // vector[STEPS_age-1] hivsurv_scale_a0;
+
+  // Prior variance
+  real<lower=0> var_incrate_time_age;
+  real<lower=0> var_incrate_time;
+  real<lower=0> var_incrate_age;
+  real<lower=0> var_natmx_time;
+  real<lower=0> var_natmx_age;
+  real<lower=0> var_art;
 
 }
 transformed data {
