@@ -1,16 +1,18 @@
-calc.e15 <- function(sx, dt){
-  dt*colSums(apply(sx, 1, cumprod))
+calc.e15 <- function(sx, dt, stand){
+  aidx <- which(colnames(sx)==as.character(15 + dt)):(which(colnames(sx)==max(stand$x_age)))
+  dt*colSums(apply(sx[,aidx], 1, cumprod))
 }
 
-calc.45q15 <- function(sx, dt){
-  aidx <- seq_len(45/dt) # assumes psurv starts at age 15
+calc.45q15 <- function(sx, dt, stand){
+  # aidx <- seq_len(45/dt) # assumes psurv starts at age 15
+  aidx <- which(colnames(sx)==as.character(15 + dt)):(which(colnames(sx)==as.character(60)))
   1.0 - exp(rowSums(log(sx[,aidx])))
 }
 
 
-calc.sx <- function(param, stand, base_tIDX=which(stand$x_time == 2005)){
+calc.sx <- function(param, stand, base_tIDX=which(stand$x_time == 2005),ind){
 
-  psurvobj <- calc.psurv(param, stand)
+  psurvobj <- calc.psurv(param, stand, ind)
   psurv <- psurvobj$psurv
   psurv.nohiv <- psurvobj$psurv.nohiv
   psurv.noart <- psurvobj$psurv.noart
@@ -71,12 +73,12 @@ calc.sx <- function(param, stand, base_tIDX=which(stand$x_time == 2005)){
   return(sx.list)
 }
 
-calc.mx.output <- function(param, stand, base_tIDX, sx.times){
+calc.mx.output <- function(param, stand, base_tIDX, sx.times, ind){
   
-  sxlist <- calc.sx(param, stand, base_tIDX)
+  sxlist <- calc.sx(param, stand, base_tIDX, ind) ### Does this need to be updated b/c starting model @ 10?  I think no...
 
-  e15 <- lapply(sxlist, calc.e15, stand$dt)
-  q4515 <- lapply(sxlist, calc.45q15, stand$dt)
+  e15 <- lapply(sxlist, calc.e15, stand$dt, stand)
+  q4515 <- lapply(sxlist, calc.45q15, stand$dt, stand)
   names(e15) <- paste("e15", names(e15), sep=".")
   names(q4515) <- paste("q4515", names(q4515), sep=".")
 
@@ -92,14 +94,16 @@ calc.mx.output <- function(param, stand, base_tIDX, sx.times){
   return(c(e15, q4515, sxlist))
 }
   
-add.mx <- function(mod, base.time = 2005, sx.times=seq(1990, 2015, 5)){
-
+add.mx <- function(mod, base.time = 2005, sx.times=seq(1990, 2015, 5), ind, tot=2){
+  
   print(paste("starting add.mx()", Sys.time()))
+  
+  mod$stand$artstart_tIDX <- mod$stand$artstart_tIDX[ind]
 
   base_tIDX <- which.min(abs(mod$stand$x_time - base.time))
   
-  param <- create.param.list(mod$fit)
-  system.time(output <- mclapply(param, calc.mx.output, mod$stand, base_tIDX, sx.times))
+  param <- create.param.list(mod$fit,ind,tot)
+  system.time(output <- lapply(param, calc.mx.output, mod$stand, base_tIDX, sx.times, ind)) # mclapply causing problems so lapply for now
   output <- do.call(mapply, c(list(FUN=cbind, SIMPLIFY=FALSE), output))  # reorder by outcome
 
   return(output)
@@ -121,42 +125,42 @@ calc.cumincid <- function(param, stand, ages=min(stand$xage), nyears=diff(range(
 }
 
 
-add.incprev <- function(mod, incprev.times=seq(1970, 2015, 5),
-                        cumincid.ages=c(15, 15, 15, 25, 35, 45, 55, 15, 20),
-                        cumincid.nyears=c(85, 45, 10, 10, 10, 10, 10, 5, 5)){
-  stand <- mod$stand
-  param <- create.param.list(mod$fit)
-
-
-  ## prev
-  system.time(prev <- mclapply(param, calc.prev, mod$stand))
-  system.time(prev <- array(unlist(prev), c(mod$stand$STEPS_time, mod$stand$STEPS_age, length(param))))
-  dimnames(prev) <- list(mod$stand$x_time, mod$stand$x_age, NULL)
-
-  ## incid
-  system.time(incid <- lapply(param, calc.incid, mod$stand))
-  incid <- array(unlist(incid), c(mod$stand$STEPS_time, mod$stand$STEPS_age, length(param)))
-  dimnames(incid) <- list(mod$stand$x_time, mod$stand$x_age, NULL)
-
-  ## cumincid
-  cumincid <- array(sapply(param, calc.cumincid, mod$stand, cumincid.ages, cumincid.nyears),
-                    c(mod$stand$STEPS_time, length(cumincid.ages), length(param)))
-  dimnames(cumincid) <- list(stand$x_time, paste("i", cumincid.nyears, "_", cumincid.ages, sep=""), NULL)
-
-  ## WHO prev
-  aidx <- 1:(35/mod$stand$dt+1L)
-  age.dist <- approx(0:99+0.5, who.standard.pop, mod$stand$x_age[aidx])$y  # prevalence age 15 to 50
-  age.dist <- age.dist/sum(age.dist)
-  who15to49prev <- apply(sweep(prev[, aidx,], 2, age.dist, "*"), c(1,3), sum)
-
-  incprev_tIDX <- as.integer(round((incprev.times - stand$x_time[1]) / stand$dt)) + 1L
-  incprev_tIDX <- incprev_tIDX[incprev_tIDX >=1 & incprev_tIDX <= length(stand$x_time)]
-
-  list(prev=prev[incprev_tIDX,,],
-       incid=incid[incprev_tIDX,,],
-       cumincid=cumincid,
-       who15to49prev=who15to49prev)
-}
+# add.incprev <- function(mod, incprev.times=seq(1970, 2015, 5),
+#                         cumincid.ages=c(15, 15, 15, 25, 35, 45, 55, 15, 20),
+#                         cumincid.nyears=c(85, 45, 10, 10, 10, 10, 10, 5, 5)){
+#   stand <- mod$stand
+#   param <- create.param.list(mod$fit)
+# 
+# 
+#   ## prev
+#   system.time(prev <- mclapply(param, calc.prev, mod$stand))
+#   system.time(prev <- array(unlist(prev), c(mod$stand$STEPS_time, mod$stand$STEPS_age, length(param))))
+#   dimnames(prev) <- list(mod$stand$x_time, mod$stand$x_age, NULL)
+# 
+#   ## incid
+#   system.time(incid <- lapply(param, calc.incid, mod$stand))
+#   incid <- array(unlist(incid), c(mod$stand$STEPS_time, mod$stand$STEPS_age, length(param)))
+#   dimnames(incid) <- list(mod$stand$x_time, mod$stand$x_age, NULL)
+# 
+#   ## cumincid
+#   cumincid <- array(sapply(param, calc.cumincid, mod$stand, cumincid.ages, cumincid.nyears),
+#                     c(mod$stand$STEPS_time, length(cumincid.ages), length(param)))
+#   dimnames(cumincid) <- list(stand$x_time, paste("i", cumincid.nyears, "_", cumincid.ages, sep=""), NULL)
+# 
+#   ## WHO prev
+#   aidx <- 1:(35/mod$stand$dt+1L)
+#   age.dist <- approx(0:99+0.5, who.standard.pop, mod$stand$x_age[aidx])$y  # prevalence age 15 to 50
+#   age.dist <- age.dist/sum(age.dist)
+#   who15to49prev <- apply(sweep(prev[, aidx,], 2, age.dist, "*"), c(1,3), sum)
+# 
+#   incprev_tIDX <- as.integer(round((incprev.times - stand$x_time[1]) / stand$dt)) + 1L
+#   incprev_tIDX <- incprev_tIDX[incprev_tIDX >=1 & incprev_tIDX <= length(stand$x_time)]
+# 
+#   list(prev=prev[incprev_tIDX,,],
+#        incid=incid[incprev_tIDX,,],
+#        cumincid=cumincid,
+#        who15to49prev=who15to49prev)
+# }
 
 
 

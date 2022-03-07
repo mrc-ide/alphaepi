@@ -155,7 +155,7 @@ prepare.stan.data <- function(sites = NULL, sexes = NULL, dat = NULL, dt = 0.1,
 
   k.natmx.time <- k.dt*(floor(natmxstart.time / k.dt) - 3L):(ceiling(max.time / k.dt) + 3L)
   k.natmx.age <- k.dt*(floor(min.age / k.dt) - 3L):(ceiling(max.age / k.dt) + 3L)
-
+  
   nk_natmx_time <- length(k.natmx.time)-4L
   nk_natmx_age <- length(k.natmx.age)-4L
   
@@ -170,7 +170,7 @@ prepare.stan.data <- function(sites = NULL, sexes = NULL, dat = NULL, dt = 0.1,
                                               x.age = rep(x.allage,length.out=data_length),
                                               ytemp = ytemp),file=tempfile(),
                               knots = list(x.time = k.natmx.time, x.age = k.natmx.age), centred=FALSE)[[1]]
-
+  
   # X_natmx_time <- splines::splineDesign(k.natmx.time, c(rep(x.natmx[1], natmxstart.tIDX-1L), x.natmx), outer.ok=TRUE)
   # Xmid_natmx_time <- splines::splineDesign(k.natmx.time, c(rep(x.natmx[1], natmxstart.tIDX-1L), x.natmx[-1]-dt/2))
   # X_natmx_age <- splines::splineDesign(k.natmx.age, x.age, outer.ok=TRUE)
@@ -292,6 +292,7 @@ prepare.stan.data <- function(sites = NULL, sexes = NULL, dat = NULL, dt = 0.1,
                     D_natmx_age           = D_natmx_age,
                     fixcoef_natmx_time    = as.integer(nk_natmx_time/2),
                     fixcoef_natmx_age     = as.integer(nk_natmx_age/2),
+                    fixcoef_incrate_age   = as.integer(nk_incrate_age/2),
                     ## ART model
                     ## nk_art                = nk.art,
                     ## k_art                 = k.art,
@@ -316,6 +317,78 @@ prepare.stan.data <- function(sites = NULL, sexes = NULL, dat = NULL, dt = 0.1,
                     ## hivmxMID_dur_a0       = hivmxMID_dur_a0)
 }
 
+prepare.mult.stand.data <- function(stands) {
+  # should probably do checks that all of the things that should be the same in the different sites getting inputted are, 
+  # in fact, the same?  but right now relying on inputs to be done correctly...
+  stan.data <- list(NSITES                    = length(stands),
+                    dt                        = stands[[1]]$dt,
+                    STEPS_time                = stands[[1]]$STEPS_time,
+                    STEPS_age                 = stands[[1]]$STEPS_age,
+                    STEPS_age_test            = stands[[1]]$STEPS_age_test,
+                    artstart_tIDX             = sapply(stands,"[[","artstart_tIDX"),
+                    test_aIDX                 = stands[[1]]$test_aIDX, # edit if there's a reason to need this to be different in each site/sex
+                    NCOH                      = sapply(stands,"[[","NCOH"),
+                    coh_cIDX                  = unlist(sapply(stands,"[[","coh_cIDX")),
+                    coh_minexpose_tIDX        = unlist(sapply(stands,"[[","coh_minexpose_tIDX")),
+                    coh_maxexpose_tIDX        = unlist(sapply(stands,"[[","coh_maxexpose_tIDX")),
+                    coh_nexit                 = unlist(sapply(stands,"[[","coh_nexit")),
+                    NEXIT                     = sapply(stands,"[[","NEXIT"),
+                    exdat_tIDX                = unlist(sapply(stands,"[[","exdat_tIDX")),
+                    exdat_minexpose_tIDX      = unlist(sapply(stands,"[[","exdat_minexpose_tIDX")),
+                    exdat_maxexpose_tIDX      = unlist(sapply(stands,"[[","exdat_maxexpose_tIDX")),
+                    exdat_ndat                = unlist(sapply(stands,"[[","exdat_ndat")),
+                    NAGGR                     = sapply(stands,"[[","NAGGR"),
+                    aggr_exposestart_tIDX     = unlist(sapply(stands,"[[","aggr_exposestart_tIDX")),
+                    aggr_exposeend_tIDX       = unlist(sapply(stands,"[[","aggr_exposeend_tIDX")),
+                    aggr_death                = unlist(sapply(stands,"[[","aggr_death")),
+                    aggr_deathinterv          = unlist(sapply(stands,"[[","aggr_deathinterv")),
+                    aggr_deathinterv_DUR      = unlist(sapply(stands,"[[","aggr_deathinterv_DUR")),
+                    aggr_hivpos               = unlist(sapply(stands,"[[","aggr_hivpos")),
+                    aggr_nrepl                = unlist(sapply(stands,"[[","aggr_nrepl")),
+                    x_time                    = stands[[1]]$x_time,
+                    x_age                     = stands[[1]]$x_age,
+                    nk_incrate_time           = stands[[1]]$nk_incrate_time,
+                    nk_incrate_age            = stands[[1]]$nk_incrate_age,
+                    X_incrate_time            = stands[[1]]$X_incrate_time,
+                    Xmid_incrate_time         = stands[[1]]$Xmid_incrate_time,
+                    X_incrate_age             = stands[[1]]$X_incrate_age,
+                    Xmid_incrate_age          = stands[[1]]$Xmid_incrate_age,
+                    D_incrate_time            = stands[[1]]$D_incrate_time,
+                    D_incrate_age             = stands[[1]]$D_incrate_age,
+                    pen_ord_incrate           = stands[[1]]$pen_ord_incrate,
+                    Pcar_prec_incrate         = stands[[1]]$Pcar_prec_incrate,
+                    nk_natmx_time             = stands[[1]]$nk_natmx_time,
+                    nk_natmx_age              = stands[[1]]$nk_natmx_age,
+                    X_natmx_time              = stands[[1]]$X_natmx_time,
+                    Xmid_natmx_time           = stands[[1]]$Xmid_natmx_time,
+                    X_natmx_age               = stands[[1]]$X_natmx_age,
+                    Xmid_natmx_age            = stands[[1]]$Xmid_natmx_age,
+                    pen_ord_natmx_time        = stands[[1]]$pen_ord_natmx_time,
+                    pen_ord_natmx_age         = stands[[1]]$pen_ord_natmx_age,
+                    D_natmx_time              = stands[[1]]$D_natmx_time,
+                    D_natmx_age               = stands[[1]]$D_natmx_age,
+                    fixcoef_natmx_time        = stands[[1]]$fixcoef_natmx_time,
+                    fixcoef_natmx_age         = stands[[1]]$fixcoef_natmx_age,
+                    fixcoef_incrate_age       = stands[[1]]$fixcoef_incrate_age,
+                    pen_ord_art               = stands[[1]]$pen_ord_art,
+                    D_art                     = as.matrix(Matrix::bdiag(lapply(stands,"[[","D_art"))),
+                    var_incrate_time_age      = stands[[1]]$var_incrate_time_age,
+                    var_incrate_time          = stands[[1]]$var_incrate_time,
+                    var_incrate_age           = stands[[1]]$var_incrate_age,
+                    var_natmx_time            = stands[[1]]$var_natmx_time,
+                    var_natmx_age             = stands[[1]]$var_natmx_age,
+                    var_art                   = stands[[1]]$var_art)
+  # cutting out: indidividual data N, id, entry_tIDX, exit_tIDX, exposestart_tIDX, entry_tIDX, exit_tIDX, exposestart_tIDX, 
+  # entry_aIDX, exit_aIDX, exit_aIDX, exposestart_aIDX, expose_DUR, hivpos, death, deathinterv, deathinterv_DUR
+  # Presumably these are needed if not cohorting the data...  i.e. future iterations...
+  # cohort data: coh_ndat
+  # exit data: exdat_cIDX
+  # aggr data: aggr_cIDX, aggr_exit_tIDX
+  # Model Parameters: x_natmx
+  # incidence model: k_incrate_time, k_incrate_age
+  # non-hiv mortality model: k_natmx_time, k_natmx_age
+  # HIV survival model - hivsurv_shape
+}
 
 #### Calculate likelihood
 

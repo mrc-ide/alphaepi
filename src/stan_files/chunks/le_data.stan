@@ -1,40 +1,42 @@
   // STATE SPACE PARAMETERS
+  int<lower=1> NSITES;
+  
   real<lower=0> dt;
   int<lower=1> STEPS_time;
   int<lower=1> STEPS_age;
   int<lower=1, upper=STEPS_age> STEPS_age_test;
-  int<lower=1, upper=STEPS_time> artstart_tIDX;
+  int<lower=1, upper=STEPS_time> artstart_tIDX[NSITES];
   int<lower=1, upper=STEPS_age> test_aIDX;
 
   vector[STEPS_time] x_time;
   vector[STEPS_age] x_age;
-
+  
   // COHORT DATA
-  int<lower=1> NCOH;
+  int<lower=1> NCOH[NSITES];
 
-  int coh_cIDX[NCOH]; 
-  int<lower=1, upper=STEPS_time> coh_minexpose_tIDX[NCOH];
-  int<lower=1, upper=STEPS_time-1> coh_maxexpose_tIDX[NCOH];
-  int<lower=1> coh_nexit[NCOH];
+  int coh_cIDX[sum(NCOH)]; 
+  int<lower=1, upper=STEPS_time> coh_minexpose_tIDX[sum(NCOH)];
+  int<lower=1, upper=STEPS_time-1> coh_maxexpose_tIDX[sum(NCOH)];
+  int<lower=1> coh_nexit[sum(NCOH)];
 
   // EXIT DATA
-  int<lower=NCOH> NEXIT;
+  int<lower=min(NCOH)> NEXIT[NSITES];
 
-  int<lower=1, upper=STEPS_time> exdat_tIDX[NEXIT];
-  int<lower=1, upper=STEPS_time> exdat_minexpose_tIDX[NEXIT];
-  int<lower=1, upper=STEPS_time> exdat_maxexpose_tIDX[NEXIT];
-  int<lower=1> exdat_ndat[NEXIT];
+  int<lower=1, upper=STEPS_time> exdat_tIDX[sum(NEXIT)];
+  int<lower=1, upper=STEPS_time> exdat_minexpose_tIDX[sum(NEXIT)];
+  int<lower=1, upper=STEPS_time> exdat_maxexpose_tIDX[sum(NEXIT)];
+  int<lower=1> exdat_ndat[sum(NEXIT)];
   
   // AGGREGATE INDIVIDUAL DATA
-  int<lower=NEXIT> NAGGR;
+  int<lower=min(NEXIT)> NAGGR[NSITES];
 
-  int<lower=1, upper=STEPS_time> aggr_exposestart_tIDX[NAGGR];
-  int<lower=1, upper=STEPS_time> aggr_exposeend_tIDX[NAGGR];
-  int<lower=0, upper=1> aggr_hivpos[NAGGR];
-  int<lower=0, upper=1> aggr_death[NAGGR];
-  int<lower=0, upper=1> aggr_deathinterv[NAGGR];
-  int<lower=0, upper=STEPS_time> aggr_deathinterv_DUR[NAGGR];
-  vector[NAGGR] aggr_nrepl;
+  int<lower=1, upper=STEPS_time> aggr_exposestart_tIDX[sum(NAGGR)];
+  int<lower=1, upper=STEPS_time> aggr_exposeend_tIDX[sum(NAGGR)];
+  int<lower=0, upper=1> aggr_hivpos[sum(NAGGR)];
+  int<lower=0, upper=1> aggr_death[sum(NAGGR)];
+  int<lower=0, upper=1> aggr_deathinterv[sum(NAGGR)];
+  int<lower=0, upper=STEPS_time> aggr_deathinterv_DUR[sum(NAGGR)];
+  vector[sum(NAGGR)] aggr_nrepl;
 
 
   // MODEL PARAMETERS
@@ -72,6 +74,8 @@
 
   int<lower=1, upper=nk_natmx_time> fixcoef_natmx_time;
   int<lower=1, upper=nk_natmx_age> fixcoef_natmx_age;
+  int<lower=1, upper=nk_incrate_age> fixcoef_incrate_age;
+
 
 
   // ART model
@@ -80,8 +84,9 @@
   // matrix[STEPS_time-1, nk_art] Xmid_art;
 
   int<lower=0> pen_ord_art;
-  matrix[STEPS_time-artstart_tIDX-pen_ord_art, STEPS_time-artstart_tIDX] D_art;
-  
+  // matrix[STEPS_time-artstart_tIDX-pen_ord_art, STEPS_time-artstart_tIDX] D_art[NSITES];
+  matrix[STEPS_time*NSITES-sum(artstart_tIDX)-pen_ord_art*NSITES, STEPS_time*NSITES-sum(artstart_tIDX)] D_art; // this will be weird!
+
   
   // HIV survival model
   // matrix[STEPS_time-1, STEPS_age-1] hivmx_dur_a0;     // sequenced [1:DUR, 1:STEPS_age]

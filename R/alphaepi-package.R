@@ -10,6 +10,7 @@
 #' @import Rcpp
 #' @import rstantools
 #' @import mgcv
+#' @import scam
 #' @importFrom rstan sampling
 #' 
 #' @references 
