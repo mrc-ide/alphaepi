@@ -12,7 +12,7 @@ convert.stan.params <- function(par, stand){
   nk_age <- stand$nk_incrate_age
   nk_natmx_time <- stand$nk_natmx_time
   nk_art <- stand$nk_art
-  
+
   coef_incrate_time_age.idx <- 1:(nk_time*nk_age)
   coef_natmx_time.idx <- nk_time*nk_age + 1:nk_natmx
   coef_natmx_age.idx <- nk_time*nk_age + nk_natmx + 1:(nk_age-1L)
@@ -21,12 +21,12 @@ convert.stan.params <- function(par, stand){
   coef_incrate_time_age <- matrix(par[coef_incrate_time_age.idx], nk_time, nk_age)
 
   coef_natmx_time <- par[coef_natmx_time.idx]
-  
+
   coef_natmx_age <- rep(0, nk_age)
   coef_natmx_age[-stand$fixcoef_age_idx] <- par[coef_natmx_age.idx]
-    
+
   coef_natmx_time_age <- outer(coef_natmx_time, coef_natmx_age, "+")
-  
+
   coef_art <- par[coef_art.idx]
 
   return(list(coef_incrate_time_age = coef_incrate_time_age,
@@ -40,7 +40,7 @@ convert.stan.params <- function(par, stand){
 #'
 #' Convert stan parameter vectors and arrays into a list of length number of resamples.
 #' Each entry in the list is a single joint sample set for all parameters.
-#' 
+#'
 create.param.list <- function(stanfit){
   param <- rstan::extract(stanfit)
   param <- lapply(seq_along(param$lp__), function(ii) list(coef_incrate_time_age   = param$coef_incrate_time_age[ii,,],
@@ -94,12 +94,12 @@ create.modpred <- function(param, stand){
 }
 
 
-cumincid.period <- function(param, stand){
-  log_incrate_time_age <- stand$X_incrate_time %*% param$coef_incrate_time_age %*% t(stand$Xmid_incrate_age)
-
-  cumincid.period <- 1.0 - exp(-stand$dt * rowSums(exp(log_incrate_time_age)))
-  return(setNames(cumincid.period, stand$x_time))
-}
+# cumincid.period <- function(param, stand){
+#   log_incrate_time_age <- stand$X_incrate_time %*% param$coef_incrate_time_age %*% t(stand$Xmid_incrate_age)
+#
+#   cumincid.period <- 1.0 - exp(-stand$dt * rowSums(exp(log_incrate_time_age)))
+#   return(setNames(cumincid.period, stand$x_time))
+# }
 
 cumnatmort.period <- function(param, stand){
   log_natmx_time_age <- stand$X_natmx_time %*% param$coef_natmx_time_age %*% t(stand$Xmid_natmx_age)
@@ -108,15 +108,15 @@ cumnatmort.period <- function(param, stand){
   return(setNames(cumnatmort.period, stand$x_time))
 }
 
-prev <- function(tidx, aidx, modpred, stand){
-  exposeDUR <- min(tidx, aidx)-1L
-  phivp <- calc_phivp(tidx, aidx, tidx-exposeDUR, aidx-exposeDUR, exposeDUR, 0,
-                      modpred$cumavoidMID_time_age, modpred$incrateMID_time_age,
-                      modpred$hivsurv_dur_a0, modpred$hivmx_dur_a0, modpred$hivmxMID_dur_a0, modpred$artrr, modpred$artrr_MID,
-                      stand$artstart_tIDX, modpred$natsurv_time_age, modpred$natmx_time_age, stand$dt)
-  phivn <- calc_phivn(tidx, aidx, 0, 0, modpred$cumavoid_time_age, modpred$natsurv_time_age, modpred$natmx_time_age)
-  return(phivp/(phivp+phivn))
-}
+# prev <- function(tidx, aidx, modpred, stand){
+#   exposeDUR <- min(tidx, aidx)-1L
+#   phivp <- calc_phivp(tidx, aidx, tidx-exposeDUR, aidx-exposeDUR, exposeDUR, 0,
+#                       modpred$cumavoidMID_time_age, modpred$incrateMID_time_age,
+#                       modpred$hivsurv_dur_a0, modpred$hivmx_dur_a0, modpred$hivmxMID_dur_a0, modpred$artrr, modpred$artrr_MID,
+#                       stand$artstart_tIDX, modpred$natsurv_time_age, modpred$natmx_time_age, stand$dt)
+#   phivn <- calc_phivn(tidx, aidx, 0, 0, modpred$cumavoid_time_age, modpred$natsurv_time_age, modpred$natmx_time_age)
+#   return(phivp/(phivp+phivn))
+# }
 
 
 Rcreate_phivp_mat <- function(modpred, stand, art=TRUE){
@@ -143,21 +143,21 @@ calc.le <- function(psurv, dt){
   dt*colSums(apply(1.0 - (psurv.last-psurv.curr)/psurv.last, 1, cumprod))
 }
 
-calc.cumincid <- function(param, stand, years=diff(range(mod$stand$x_age))){
-  aidx <- seq_len(years/stand$dt)
-  log_incrate_time_age <- stand$X_incrate_time %*% param$coef_incrate_time_age %*% t(stand$Xmid_incrate_age[aidx,])
-  cumincid.period <- 1.0 - exp(-stand$dt * rowSums(exp(log_incrate_time_age)))
-  setNames(cumincid.period, stand$x_time)
-}
-
-calc.incid <- function(param, stand){ exp(stand$X_incrate_time %*% param$coef_incrate_time_age %*% t(stand$X_incrate_age)) }
-
-calc.prev <- function(param, stand){
-  modpred <- create.modpred(param, stand)
-  phivn <- Rcreate_phivn_mat(modpred)
-  phivp <- Rcreate_phivp_mat(modpred, stand)
-  return(phivp/(phivn+phivp))
-}
+# calc.cumincid <- function(param, stand, years=diff(range(mod$stand$x_age))){
+#   aidx <- seq_len(years/stand$dt)
+#   log_incrate_time_age <- stand$X_incrate_time %*% param$coef_incrate_time_age %*% t(stand$Xmid_incrate_age[aidx,])
+#   cumincid.period <- 1.0 - exp(-stand$dt * rowSums(exp(log_incrate_time_age)))
+#   setNames(cumincid.period, stand$x_time)
+# }
+#
+# calc.incid <- function(param, stand){ exp(stand$X_incrate_time %*% param$coef_incrate_time_age %*% t(stand$X_incrate_age)) }
+#
+# calc.prev <- function(param, stand){
+#   modpred <- create.modpred(param, stand)
+#   phivn <- Rcreate_phivn_mat(modpred)
+#   phivp <- Rcreate_phivp_mat(modpred, stand)
+#   return(phivp/(phivn+phivp))
+# }
 
 
 
@@ -207,32 +207,32 @@ who.standard.pop <- setNames(c(179177, 178022, 177011, 176133, 175366, 174700, 1
 
 
 
-add.incprev <- function(mod){
-  param <- create.param.list(mod$fit)
-
-  ## prev
-  system.time(prev <- mclapply(param, calc.prev, mod$stand))
-  system.time(prev <- array(unlist(prev), c(mod$stand$STEPS_time, mod$stand$STEPS_age, length(param))))
-  dimnames(prev) <- list(mod$stand$x_time, mod$stand$x_age, NULL)
-  mod$prev <- prev
-
-  ## incid
-  system.time(incid <- lapply(param, calc.incid, mod$stand))
-  incid <- array(unlist(incid), c(mod$stand$STEPS_time, mod$stand$STEPS_age, length(param)))
-  dimnames(incid) <- list(mod$stand$x_time, mod$stand$x_age, NULL)
-  mod$incid <- incid
-
-  ## cumincid
-  mod$cumincid <- sapply(param, calc.cumincid, mod$stand, years=45) # incidence between age 15 and 60
-
-  ## WHO prev
-  aidx <- 1:(35/mod$stand$dt+1L)
-  age.dist <- approx(0:99+0.5, who.standard.pop, mod$stand$x_age[aidx])$y  # prevalence age 15 to 50
-  age.dist <- age.dist/sum(age.dist)
-  mod$who15to49prev <- apply(sweep(mod$prev[, aidx,], 2, age.dist, "*"), c(1,3), sum)
-
-  return(mod)
-}
+# add.incprev <- function(mod){
+#   param <- create.param.list(mod$fit)
+#
+#   ## prev
+#   system.time(prev <- mclapply(param, calc.prev, mod$stand))
+#   system.time(prev <- array(unlist(prev), c(mod$stand$STEPS_time, mod$stand$STEPS_age, length(param))))
+#   dimnames(prev) <- list(mod$stand$x_time, mod$stand$x_age, NULL)
+#   mod$prev <- prev
+#
+#   ## incid
+#   system.time(incid <- lapply(param, calc.incid, mod$stand))
+#   incid <- array(unlist(incid), c(mod$stand$STEPS_time, mod$stand$STEPS_age, length(param)))
+#   dimnames(incid) <- list(mod$stand$x_time, mod$stand$x_age, NULL)
+#   mod$incid <- incid
+#
+#   ## cumincid
+#   mod$cumincid <- sapply(param, calc.cumincid, mod$stand, years=45) # incidence between age 15 and 60
+#
+#   ## WHO prev
+#   aidx <- 1:(35/mod$stand$dt+1L)
+#   age.dist <- approx(0:99+0.5, who.standard.pop, mod$stand$x_age[aidx])$y  # prevalence age 15 to 50
+#   age.dist <- age.dist/sum(age.dist)
+#   mod$who15to49prev <- apply(sweep(mod$prev[, aidx,], 2, age.dist, "*"), c(1,3), sum)
+#
+#   return(mod)
+# }
 
 
 ##########################
@@ -306,3 +306,170 @@ plot.45q15 <- function(q4515, stand, main, ylim=c(0, 0.8), xlim=c(1980, 2015)){
   return(invisible(NULL))
 }
 
+plot.le.updated <- function(le, stand, main,ylim=c(35, 65), xlim=c(1980, 2015),
+                            legendonly=FALSE){
+  ##
+  xx <- stand$x_time[-1]
+  idx.est <- 2:stand$STEPS_time - 1
+  idx.noart <- stand$artstart_tIDX:stand$STEPS_time-1
+  idx.nohiv <- which(xx %in% stand$x_natmx)
+  dataest <- data.frame(xest = xx[idx.est],
+                        yest = rowMeans(le$le[idx.est,]),
+                        yestmin = apply(le$le[idx.est,], 1, quantile , 0.025),
+                        yestmax = apply(le$le[idx.est,], 1, quantile , 0.975))
+  datanohiv <- data.frame(xnohiv = xx[idx.nohiv],
+                          ynohiv = rowMeans(le$le.nohiv[idx.nohiv,]),
+                          ynohivmin = apply(le$le.nohiv[idx.nohiv,], 1, quantile , 0.025),
+                          ynohivmax = apply(le$le.nohiv[idx.nohiv,], 1, quantile , 0.975))
+  datanoart = data.frame(xnoart = xx[idx.noart],
+                         ynoart = rowMeans(le$le.noart[idx.noart,]),
+                         ynoartmin = apply(le$le.noart[idx.noart,], 1, quantile , 0.025),
+                         ynoartmax = apply(le$le.noart[idx.noart,], 1, quantile , 0.975))
+  out <- ggplot() +
+    geom_line(data = dataest,
+              aes(x=xest,y=yest,col="Observed LE"), size=1.2) +
+    geom_ribbon(data = dataest,
+                aes(x=xest,ymin=yestmin,ymax=yestmax,fill="Observed LE"),
+                alpha=0.2,col=NA) +
+    geom_line(data = datanohiv,
+              aes(x=xnohiv,y=ynohiv,col="Non-HIV LE"), size=1.2) +
+    geom_ribbon(data = datanohiv,
+                aes(x=xnohiv,ymin=ynohivmin,ymax=ynohivmax,fill="Non-HIV LE"),
+                alpha=0.2,col=NA) +
+    geom_line(data = datanoart,
+              aes(x=xnoart,y=ynoart,col="No-ART counterfactual"),size=1.2) +
+    geom_ribbon(data = datanoart,
+                aes(x=xnoart,ymin=ynoartmin,ymax=ynoartmax,fill="No-ART counterfactual"),
+                alpha=0.2,col=NA) +
+    theme_bw() +
+    xlab("") +
+    ylab(expression(e[15])) +
+    scale_x_continuous(expand=c(0,0),limits=xlim) +
+    scale_y_continuous(expand=c(0,0)) +
+    coord_cartesian(ylim=ylim)+
+    ggtitle(main) +
+    scale_fill_discrete("") +
+    scale_color_discrete("") +
+    theme(legend.position="bottom")
+  if(legendonly==FALSE) {
+    out <- out + theme(legend.position="none")
+  } else {
+    tmp <- ggplot_gtable(ggplot_build(out))
+    leg <- which(sapply(tmp$grobs, function(y) y$name) == "guide-box")
+    out <- cowplot::ggdraw() +
+      cowplot::draw_grob(grid::grobTree(tmp$grobs[[leg]]))
+  }
+  out
+}
+
+plot.e15.updated <- function(le, stand, main,ylim=c(35, 65), xlim=c(1980, 2015),
+                             legendonly=FALSE){
+  ##
+  xx <- stand$x_time[-1]
+  idx.est <- 2:stand$STEPS_time - 1
+  idx.noart <- stand$artstart_tIDX:stand$STEPS_time-1
+  idx.nohiv <- which(round(xx,1) %in% round(stand$x_natmx,1))
+  dataest <- data.frame(xest = xx[idx.est],
+                        yest = rowMeans(le$e15.obs[idx.est,]),
+                        yestmin = apply(le$e15.obs[idx.est,], 1, quantile , 0.025),
+                        yestmax = apply(le$e15.obs[idx.est,], 1, quantile , 0.975))
+  datanohiv <- data.frame(xnohiv = xx[idx.nohiv],
+                          ynohiv = rowMeans(le$e15.nohiv),
+                          ynohivmin = apply(le$e15.nohiv, 1, quantile , 0.025),
+                          ynohivmax = apply(le$e15.nohiv, 1, quantile , 0.975))
+  datanoart = data.frame(xnoart = xx[idx.noart],
+                         ynoart = rowMeans(le$e15.noart),
+                         ynoartmin = apply(le$e15.noart, 1, quantile , 0.025),
+                         ynoartmax = apply(le$e15.noart, 1, quantile , 0.975))
+  out <- ggplot() +
+    geom_line(data = dataest,
+              aes(x=xest,y=yest,col="Observed LE"), size=1.2) +
+    geom_ribbon(data = dataest,
+                aes(x=xest,ymin=yestmin,ymax=yestmax,fill="Observed LE"),
+                alpha=0.2,col=NA) +
+    geom_line(data = datanohiv,
+              aes(x=xnohiv,y=ynohiv,col="Non-HIV LE"), size=1.2) +
+    geom_ribbon(data = datanohiv,
+                aes(x=xnohiv,ymin=ynohivmin,ymax=ynohivmax,fill="Non-HIV LE"),
+                alpha=0.2,col=NA) +
+    geom_line(data = datanoart,
+              aes(x=xnoart,y=ynoart,col="No-ART counterfactual"),size=1.2) +
+    geom_ribbon(data = datanoart,
+                aes(x=xnoart,ymin=ynoartmin,ymax=ynoartmax,fill="No-ART counterfactual"),
+                alpha=0.2,col=NA) +
+    theme_bw() +
+    xlab("") +
+    ylab(expression(e[15])) +
+    scale_x_continuous(expand=c(0,0),limits=xlim) +
+    scale_y_continuous(expand=c(0,0)) +
+    coord_cartesian(ylim=ylim)+
+    ggtitle(main) +
+    scale_fill_discrete("") +
+    scale_color_discrete("") +
+    theme(legend.position="bottom")
+  if(legendonly==FALSE) {
+    out <- out + theme(legend.position="none")
+  } else {
+    tmp <- ggplot_gtable(ggplot_build(out))
+    leg <- which(sapply(tmp$grobs, function(y) y$name) == "guide-box")
+    out <- cowplot::ggdraw() +
+      cowplot::draw_grob(grid::grobTree(tmp$grobs[[leg]]))
+  }
+  out
+}
+
+plot.45q15.updated <- function(q4515, stand, main, ylim=c(0, 0.8), xlim=c(1980, 2015),
+                               legendonly=FALSE){
+  ##
+  xx <- stand$x_time[-1]
+  idx.est <- 2:stand$STEPS_time - 1
+  idx.noart <- stand$artstart_tIDX:stand$STEPS_time-1
+  idx.nohiv <- which(xx %in% stand$x_natmx)
+  dataest <- data.frame(xest = xx[idx.est],
+                        yest = rowMeans(q4515$q4515.obs[idx.est,]),
+                        yestmin = apply(q4515$q4515.obs[idx.est,], 1, quantile , 0.025),
+                        yestmax = apply(q4515$q4515.obs[idx.est,], 1, quantile , 0.975))
+  datanohiv <- data.frame(xnohiv = xx[idx.nohiv],
+                          ynohiv = rowMeans(q4515$q4515.nohiv[rownames(q4515$q4515.nohiv) %in% xx[idx.nohiv],]),
+                          ynohivmin = apply(q4515$q4515.nohiv[rownames(q4515$q4515.nohiv) %in% xx[idx.nohiv],], 1, quantile , 0.025),
+                          ynohivmax = apply(q4515$q4515.nohiv[rownames(q4515$q4515.nohiv) %in% xx[idx.nohiv],], 1, quantile , 0.975))
+  datanoart = data.frame(xnoart = xx[idx.noart],
+                         ynoart = rowMeans(q4515$q4515.noart[rownames(q4515$q4515.noart) %in% xx[idx.noart],]),
+                         ynoartmin = apply(q4515$q4515.noart[rownames(q4515$q4515.noart) %in% xx[idx.noart],], 1, quantile , 0.025),
+                         ynoartmax = apply(q4515$q4515.noart[rownames(q4515$q4515.noart) %in% xx[idx.noart],], 1, quantile , 0.975))
+  out <- ggplot() +
+    geom_line(data = dataest,
+              aes(x=xest,y=yest,col="Observed mortality"), size=1.2) +
+    geom_ribbon(data = dataest,
+                aes(x=xest,ymin=yestmin,ymax=yestmax,fill="Observed mortality"),
+                alpha=0.2,col=NA) +
+    geom_line(data = datanohiv,
+              aes(x=xnohiv,y=ynohiv,col="Non-HIV mortality"), size=1.2) +
+    geom_ribbon(data = datanohiv,
+                aes(x=xnohiv,ymin=ynohivmin,ymax=ynohivmax,fill="Non-HIV mortality"),
+                alpha=0.2,col=NA) +
+    geom_line(data = datanoart,
+              aes(x=xnoart,y=ynoart,col="No-ART counterfactual"),size=1.2) +
+    geom_ribbon(data = datanoart,
+                aes(x=xnoart,ymin=ynoartmin,ymax=ynoartmax,fill="No-ART counterfactual"),
+                alpha=0.2,col=NA) +
+    theme_bw() +
+    xlab("") +
+    ylab(expression(""[45]*q[15])) +
+    scale_x_continuous(expand=c(0,0),limits=xlim) +
+    scale_y_continuous(expand=c(0,0)) +
+    coord_cartesian(ylim=ylim)+
+    scale_color_discrete("") +
+    scale_fill_discrete("") +
+    ggtitle(main) +
+    theme(legend.position="bottom")
+  if(legendonly==FALSE) {
+    out <- out + theme(legend.position="none")
+  } else {
+    tmp <- ggplot_gtable(ggplot_build(out))
+    leg <- which(sapply(tmp$grobs, function(y) y$name) == "guide-box")
+    out <- cowplot::ggdraw() +
+      cowplot::draw_grob(grid::grobTree(tmp$grobs[[leg]]))
+  }
+  out
+}
