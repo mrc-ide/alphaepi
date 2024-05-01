@@ -1,5 +1,5 @@
 Package: alphaepi
-Version: 0.0.0.9000
+Version: 0.0.0.9001
 Title: Epidemiological analysis of HIV population cohort ata
 Description: What the package does (one paragraph).
 Author: Jeff Eaton [aut,cre]
@@ -9,8 +9,8 @@ Encoding: UTF-8
 LazyData: true
 ByteCompile: true
 Depends: R (>= 3.4.0), Rcpp (>= 0.12.16), methods
-Imports: rstan (>= 2.17.3), rstantools (>= 1.5.0), mgcv (>= 1.8.0), expm (>= 0.99)
-LinkingTo: StanHeaders (>= 2.17.2), rstan (>= 2.17.3), BH (>= 1.66.0-1), Rcpp (>= 0.12.16), RcppEigen (>= 0.3.3.4.0)
+Imports: rstan (>= 2.17.3), rstantools (>= 1.5.0), mgcv (>= 1.8.0), expm (>= 0.99), RcppParallel (>= 5.1.7)
+LinkingTo: StanHeaders (>= 2.17.2), rstan (>= 2.17.3), BH (>= 1.66.0-1), Rcpp (>= 0.12.16), RcppEigen (>= 0.3.3.4.0), RcppParallel (>= 5.1.7)
 SystemRequirements: GNU make
 NeedsCompilation: yes
 RoxygenNote: 6.0.1
