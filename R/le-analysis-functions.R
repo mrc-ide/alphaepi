@@ -41,28 +41,30 @@ convert.stan.params <- function(par, stand){
 #' Convert stan parameter vectors and arrays into a list of length number of resamples.
 #' Each entry in the list is a single joint sample set for all parameters.
 #'
-create.param.list <- function(stanfit){
+create.param.list <- function(stanfit, ind, tot=2){
   param <- rstan::extract(stanfit)
-  param <- lapply(seq_along(param$lp__), function(ii) list(coef_incrate_time_age   = param$coef_incrate_time_age[ii,,],
-                                                           coef_natmx_time         = param$coef_natmx_time[ii,],
-                                                           coef_natmx_age          = param$coef_natmx_age[ii,],
-                                                           coef_natmx_time_age     = outer(param$coef_natmx_time[ii,], param$coef_natmx_age[ii,], "+"),
-                                                           dt_log_artrr            = param$dt_log_artrr[ii,],
-                                                           sigma_incrate_time_age  = param$sigma_incrate_time_age[ii],
-                                                           sigma_incrate_time      = param$sigma_incrate_time[ii],
-                                                           sigma_incrate_age       = param$sigma_incrate_age[ii],
-                                                           sigma_natmx_time        = param$sigma_natmx_time[ii],
-                                                           sigma_natmx_age         = param$sigma_natmx_age[ii],
-                                                           sigma_art               = param$sigma_art[ii],
-                                                           hivsurv_shape           = param$hivsurv_shape[ii],
-                                                           hivsurv_scale_b0        = param$hivsurv_scale_b0[ii],
-                                                           hivsurv_scale_b1        = param$hivsurv_scale_b1[ii]))
+  param <- lapply(seq_along(param$lp__), function(ii) list(coef_incrate_time_age   = param$coef_incrate_time_age[ii,ind,,],
+                                                           coef_incrate_time_young = param$coef_incrate_time_young[ii,ind,],
+                                                           coef_natmx_time         = param$coef_natmx_time[ii,ind,],
+                                                           coef_natmx_age          = param$coef_natmx_age[ii,ind,],
+                                                           coef_natmx_time_age     = outer(param$coef_natmx_time[ii,ind,], param$coef_natmx_age[ii,ind,], "+"),
+                                                           dt_log_artrr            = param$dt_log_artrr[ii, (ncol(param$dt_log_artrr)/tot*(ind-1)+1):(ncol(param$dt_log_artrr)/tot*ind)],
+                                                           sigma2_incrate_time_age = param$sigma_incrate_time_age[ii],
+                                                           sigma2_natmx_time       = param$sigma_natmx_time[ii],
+                                                           sigma2_natmx_age        = param$sigma_natmx_age[ii],
+                                                           sigma2_art              = param$sigma_art[ii],
+                                                           hivsurv_shape           = param$hivsurv_shape[ii,ind],
+                                                           hivsurv_scale_b0        = param$hivsurv_scale_b0[ii,ind],
+                                                           hivsurv_scale_b1        = param$hivsurv_scale_b1[ii,ind]))
   return(param)
 }
 
-create.modpred <- function(param, stand){
+create.modpred <- function(param, stand, ind){
 
   incrateMID_time_age <- exp(stand$Xmid_incrate_time %*% param$coef_incrate_time_age %*% t(stand$Xmid_incrate_age))
+  extra <- matrix(1e-15,nrow=nrow(incrateMID_time_age),ncol=24)
+  youngs <- exp(stand$Xmid_incrate_time %*% param$coef_incrate_time_young)
+  incrateMID_time_age <- cbind(youngs,extra,incrateMID_time_age)
   cumavoid_time_age <- exp(-stand$dt*diagCumSum(incrateMID_time_age))
   cumavoidMID_time_age <- cumavoid_time_age[1:(stand$STEPS_time-1), 1:(stand$STEPS_age-1)]*exp(-stand$dt/2*incrateMID_time_age)
 
@@ -126,8 +128,8 @@ Rcreate_phivp_mat <- function(modpred, stand, art=TRUE){
 }
 Rcreate_phivn_mat <- function(modpred){ return(modpred$cumavoid_time_age * modpred$natsurv_time_age)}
 
-calc.psurv <- function(param, stand){
-  modpred <- create.modpred(param, stand)
+calc.psurv <- function(param, stand, ind){
+  modpred <- create.modpred(param, stand, ind)
   phivn <- Rcreate_phivn_mat(modpred)
   phivp <- Rcreate_phivp_mat(modpred, stand)
   phivp.noart <- Rcreate_phivp_mat(modpred, stand, art=FALSE)
@@ -167,8 +169,9 @@ calc.le <- function(psurv, dt){
 
 library(parallel)
 
-calc.45q15 <- function(psurv, dt){
-  aidx <- seq_len(45/dt) # assumes psurv starts at age 15
+calc.45q15 <- function(psurv, stand, dt){
+  # aidx <- seq_len(45/dt) # assumes psurv starts at age 15
+  aidx <- which(stand$x_age==15):which(stand$x_age==60)
   psurv.last <- psurv[-nrow(psurv), -ncol(psurv)]
   psurv.curr <- psurv[-1,-1]
   qx <- (psurv.last[,aidx]-psurv.curr[,aidx])/psurv.last[,aidx]
@@ -186,9 +189,9 @@ add.le <- function(mod){
 add.45q15 <- function(mod){
   param <- create.param.list(mod$fit)
   psurvobj <- mclapply(param, calc.psurv, mod$stand)
-  list(q4515       = sapply(lapply(psurvobj, "[[", "psurv"), calc.45q15, mod$stand$dt),
-       q4515.noart = sapply(lapply(psurvobj, "[[", "psurv.noart"), calc.45q15, mod$stand$dt),
-       q4515.nohiv = sapply(lapply(psurvobj, "[[", "psurv.nohiv"), calc.45q15, mod$stand$dt))
+  list(q4515       = sapply(lapply(psurvobj, "[[", "psurv"), calc.45q15, mod$stand, mod$stand$dt),
+       q4515.noart = sapply(lapply(psurvobj, "[[", "psurv.noart"), calc.45q15, mod$stand, mod$stand$dt),
+       q4515.nohiv = sapply(lapply(psurvobj, "[[", "psurv.nohiv"), calc.45q15, mod$stand, mod$stand$dt))
 }
 
 add.mx <- function(mod){
@@ -197,9 +200,9 @@ add.mx <- function(mod){
   list(le       = sapply(lapply(psurvobj, "[[", "psurv"), calc.le, mod$stand$dt),
        le.noart = sapply(lapply(psurvobj, "[[", "psurv.noart"), calc.le, mod$stand$dt),
        le.nohiv = sapply(lapply(psurvobj, "[[", "psurv.nohiv"), calc.le, mod$stand$dt),
-       q4515       = sapply(lapply(psurvobj, "[[", "psurv"), calc.45q15, mod$stand$dt),
-       q4515.noart = sapply(lapply(psurvobj, "[[", "psurv.noart"), calc.45q15, mod$stand$dt),
-       q4515.nohiv = sapply(lapply(psurvobj, "[[", "psurv.nohiv"), calc.45q15, mod$stand$dt))
+       q4515       = sapply(lapply(psurvobj, "[[", "psurv"), calc.45q15, mod$stand, mod$stand$dt),
+       q4515.noart = sapply(lapply(psurvobj, "[[", "psurv.noart"), calc.45q15, mod$stand, mod$stand$dt),
+       q4515.nohiv = sapply(lapply(psurvobj, "[[", "psurv.nohiv"), calc.45q15, mod$stand, mod$stand$dt))
 }
 
 
@@ -245,15 +248,25 @@ cred.region <- function(x, y, ...)
 transp <- function(col, alpha=0.5)
   return(apply(col2rgb(col), 2, function(c) rgb(c[1]/255, c[2]/255, c[3]/255, alpha)))
 
-plot.timebysex <- function(m.post, f.post, main, ylim=c(0,1), xlim=c(1990, 2015), ylab=""){
+plot.timebysex <- function(m.post, f.post, main, ylim=c(0,.25), xlim=c(1990, 2015), ylab="",
+                           ages = c(15,50), legendonly = FALSE){
   par(tcl=-0.25, las=1, mgp=c(2, 0.5, 0), mar=c(2.1, 3.1, 2.1, 1.1))
   xx <- as.numeric(rownames(m.post))
-  matplot(xx, cbind(apply(m.post, 1, median), apply(f.post, 1, median)),
-        type="l", ylim=ylim, xlim=xlim, col=c("royalblue", "deeppink"), lty=1, lwd=1.5,
-        main=main, xlab="", ylab=ylab)
-  cred.region(xx, apply(m.post, 1, quantile, c(0.025, 0.975)), col=transp("royalblue"))
-  cred.region(xx, apply(f.post, 1, quantile, c(0.025, 0.975)), col=transp("deeppink"))
-  legend("topleft", legend=c("men", "women"), col=c("royalblue", "deeppink"), lty=1.5, bg="white", cex=0.8)
+  # m.post <- m.post[,as.numeric(colnames(m.post))>=ages[1] &
+  #                      as.numeric(colnames(m.post))<ages[2],]
+  # f.post <- f.post[,as.numeric(colnames(f.post))>=ages[1] &
+  #                      as.numeric(colnames(f.post))<ages[2],]
+  if(legendonly!=TRUE){
+    matplot(xx, cbind(apply(m.post, 1, median), apply(f.post, 1, median)),
+            type="l", ylim=ylim, xlim=xlim, col=c("royalblue", "deeppink"), lty=1, lwd=1.5,
+            main=main, xlab="", ylab=ylab)
+    cred.region(xx, apply(m.post, 1, quantile, c(0.025, 0.975)), col=transp("royalblue"))
+    cred.region(xx, apply(f.post, 1, quantile, c(0.025, 0.975)), col=transp("deeppink"))
+  }
+  if (legendonly==TRUE) {
+    plot.new()
+    legend("center", legend=c("men", "women"), col=c("royalblue", "deeppink"), lty=1.5, bg="white", cex=0.8)
+  }
 }
 
 plot.ci <- function(x, y, se=NULL, lower=NULL, upper=NULL, col=1, pch=20, cex=0.8, lty=1, lwd=1){
@@ -270,16 +283,16 @@ plot.le <- function(le, stand, main, ylim=c(35, 65), xlim=c(1980, 2015)){
   idx.noart <- stand$artstart_tIDX:stand$STEPS_time-1
   idx.nohiv <- which(xx %in% stand$x_natmx)
   ##
-  plot(xx[idx.le], rowMeans(le$le[idx.le,]), type='n', lty=1, ylim=ylim, xlim=xlim,
+  plot(xx[idx.le], rowMeans(le$e15.obs[idx.le,]), type='n', lty=1, ylim=ylim, xlim=xlim,
        ylab=expression(e[15]), xlab="", main=main)
   ##
-  cred.region(xx[idx.noart], apply(le$le.noart[idx.noart,], 1, quantile, c(0.025, 0.975)), col=transp(2))
-  cred.region(xx[idx.nohiv], apply(le$le.nohiv[idx.nohiv,], 1, quantile, c(0.025, 0.975)), col=transp(3))
-  cred.region(xx[idx.le], apply(le$le[idx.le,], 1, quantile, c(0.025, 0.975)), col=transp(1))
+  cred.region(xx[idx.noart], apply(le$e15.noart, 1, quantile, c(0.025, 0.975)), col=transp(2))
+  cred.region(xx[idx.nohiv], apply(le$e15.nohiv, 1, quantile, c(0.025, 0.975)), col=transp(3))
+  cred.region(xx[idx.le], apply(le$e15.obs[idx.le,], 1, quantile, c(0.025, 0.975)), col=transp(1))
   ##
-  lines(xx[idx.noart], rowMeans(le$le.noart[idx.noart,]), col=2, lwd=1.5)
-  lines(xx[idx.nohiv], rowMeans(le$le.nohiv[idx.nohiv,]), col=3, lwd=1.5)
-  lines(xx[idx.le], rowMeans(le$le[idx.le,]), col=1, lwd=1.5)
+  lines(xx[idx.noart], rowMeans(le$e15.noart), col=2, lwd=1.5)
+  lines(xx[idx.nohiv], rowMeans(le$e15.nohiv), col=3, lwd=1.5)
+  lines(xx[idx.le], rowMeans(le$e15.obs[idx.le,]), col=1, lwd=1.5)
   ##
   return(invisible(NULL))
 }
@@ -292,16 +305,17 @@ plot.45q15 <- function(q4515, stand, main, ylim=c(0, 0.8), xlim=c(1980, 2015)){
   idx.noart <- stand$artstart_tIDX:stand$STEPS_time-1
   idx.nohiv <- which(xx %in% stand$x_natmx)
   ##
-  plot(xx[idx.est], rowMeans(q4515$q4515[idx.est,]), type='n', lty=1, ylim=ylim, xlim=xlim,
+  ###EDITING HERE - q4515.obs instead of q4515
+  plot(xx[idx.est], rowMeans(q4515$q4515.obs[idx.est,]), type='n', lty=1, ylim=ylim, xlim=xlim,
        ylab=expression(""[45]~q[15]), xlab="", main=main)
   ##
-  cred.region(xx[idx.noart], apply(q4515$q4515.noart[idx.noart,], 1, quantile, c(0.025, 0.975)), col=transp(2))
-  cred.region(xx[idx.nohiv], apply(q4515$q4515.nohiv[idx.nohiv,], 1, quantile, c(0.025, 0.975)), col=transp(3))
-  cred.region(xx[idx.est], apply(q4515$q4515[idx.est,], 1, quantile, c(0.025, 0.975)), col=transp(1))
+  cred.region(xx[idx.noart], apply(q4515$q4515.noart, 1, quantile, c(0.025, 0.975)), col=transp(2))
+  cred.region(xx[idx.nohiv], apply(q4515$q4515.nohiv, 1, quantile, c(0.025, 0.975)), col=transp(3))
+  cred.region(xx[idx.est], apply(q4515$q4515.obs, 1, quantile, c(0.025, 0.975)), col=transp(1))
   ##
-  lines(xx[idx.noart], rowMeans(q4515$q4515.noart[idx.noart,]), col=2, lwd=1.5)
-  lines(xx[idx.nohiv], rowMeans(q4515$q4515.nohiv[idx.nohiv,]), col=3, lwd=1.5)
-  lines(xx[idx.est], rowMeans(q4515$q4515[idx.est,]), col=1, lwd=1.5)
+  lines(xx[idx.noart], rowMeans(q4515$q4515.noart), col=2, lwd=1.5)
+  lines(xx[idx.nohiv], rowMeans(q4515$q4515.nohiv), col=3, lwd=1.5)
+  lines(xx[idx.est], rowMeans(q4515$q4515.obs), col=1, lwd=1.5)
   ##
   return(invisible(NULL))
 }
@@ -473,3 +487,4 @@ plot.45q15.updated <- function(q4515, stand, main, ylim=c(0, 0.8), xlim=c(1980, 
   }
   out
 }
+

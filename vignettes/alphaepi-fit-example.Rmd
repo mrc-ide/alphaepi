@@ -9,145 +9,164 @@ vignette: >
   %\VignetteEncoding{UTF-8}
 ---
 
-<!-- ```{r setup, include = FALSE} -->
-<!-- knitr::opts_chunk$set( -->
-<!--   collapse = TRUE, -->
-<!--   comment = "#>" -->
-<!-- ) -->
-<!-- ``` -->
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
 
-<!-- This vignette is a working document to illustrate the basic tools of the analysis. -->
+This vignette is a working document to illustrate the basic tools of the analysis.
 
-<!-- ## Load data  -->
+## Load data
 
-<!-- Prepped cohort datasets are stored separately in the `alphaepisdata` package. Load this package to access the data sets. -->
+Prepped cohort datasets are stored separately in the `alphaepisdata` package. Load this package to access the data sets.
 
-<!-- ```{r load data} -->
-<!-- devtools::load_all("~/Documents/Code/R/alphaepisdata", export_all=FALSE) -->
-<!-- devtools::load_all() -->
+```{r load data}
+devtools::load_all("/Users/krisher/Documents/GitHub/alphaepisdata.rakai", export_all=FALSE)
+devtools::load_all("/Users/krisher/Documents/GitHub/mrc-ide/alphaepi")
 
-<!-- ## Load individual, residences, and HIV tests datasets -->
-<!-- data(alpha_ind, alpha_res, alpha_hiv) -->
+## Load individual, residences, and HIV tests datasets
+data(alpha_ind, alpha_res, alpha_hiv)
 
-<!-- hiv <- subset(alpha_hiv, type %in% c("survey", "self report") & !is.na(result) & !is.na(testdate)) -->
-<!-- res <- alpha_res -->
-<!-- ind <- alpha_ind -->
+hiv <- subset(alpha_hiv, type %in% c("survey", "self report") & !is.na(result) & !is.na(testdate))
+res <- alpha_res
+ind <- alpha_ind
 
-<!-- ``` -->
+```
 
-<!-- The `prepare.stan.data()` function sets up stan input data for a model fit. Currently,  -->
-<!-- the function uses datasets from the global environment, among other greivances which  -->
-<!-- should be improved. -->
+The `prepare.stan.data()` function sets up stan input data for a model fit. Currently,
+the function uses datasets from the global environment, among other greivances which
+should be improved.
 
-<!-- ```{r} -->
-<!-- rakaif_stand <- prepare.stan.data(c('Rakai', '1975prior451'), 'Female', -->
-<!--                                   min.time=1970, max.time=2015, min.age=15, max.age=100, -->
-<!--                                   natmxstart.time=1994, artstart.time=2004.5, cohortstart.time=1970, cohortend.time=2015, -->
-<!--                                   pen.ord.incrate=1, pen.ord.natmx.time=1, pen.ord.natmx.age=1, pen.ord.art=1, -->
-<!--                                   dt=0.2, k.dt=5, nk.art=5, hivonly=FALSE, hivelig=FALSE) -->
-<!-- ``` -->
+```{r}
+rakaif_stand <- prepare.stan.data(c('Rakai_30', '1975prior451'), 'Female',
+                                  min.time=1970, max.time=2015, min.age=15, max.age=100,
+                                  natmxstart.time=1994, artstart.time=2004.5,
+                                  cohortstart.time=1970, cohortend.time=2015,
+                                  pen.ord.incrate=1, pen.ord.natmx.time=1, pen.ord.natmx.age=1,
+                                  pen.ord.art=1,
+                                  dt=0.2, k.dt=5, nk.art=5, hivonly=FALSE, hivelig=FALSE)
 
-<!-- Call `rstan::sampling()` to fit the model. Usually, I run approximately 4 chains for 500 iterations. This is best done on a cluster. -->
+rakaim_stand <- prepare.stan.data(c('Rakai_30', '1975prior451'), 'Male',
+                                  min.time=1970, max.time=2015, min.age=15, max.age=100,
+                                  natmxstart.time=1994, artstart.time=2004.5,
+                                  cohortstart.time=1970, cohortend.time=2015,
+                                  pen.ord.incrate=1, pen.ord.natmx.time=1, pen.ord.natmx.age=1,
+                                  pen.ord.art=1,
+                                  dt=0.2, k.dt=5, nk.art=5, hivonly=FALSE, hivelig=FALSE)
 
-<!-- ```{r, fit model} -->
-<!-- fit <- rstan::sampling(alphaepi::stanmodels$le_interact, data=rakaif_stand, -->
-<!--                        iter=25, chains=1, chain_id=1, refresh=1) -->
-<!-- ``` -->
+rakai_stand <- prepare.mult.stand.data(list(rakaim_stand, rakaif_stand))
+```
 
-<!-- The approach to analysis of model outputs is to create an output object and then -->
-<!-- call functions to analyse posterior outputs. -->
+Call `rstan::sampling()` to fit the model. Usually, I run approximately 4 chains for 500 iterations. This is best done on a cluster.
 
-<!-- ```{r, model outputs} -->
-<!-- mod <- list(fit = fit, stand = rakaif_stand) -->
-<!-- mx_out <- add.mx(mod) -->
+```{r, fit model}
+fit <- rstan::sampling(alphaepi:::stanmodels$le_interact, data=rakai_stand,
+                       iter=25, chains=1, chain_id=1, refresh=1)
+```
 
-<!-- saveRDS(mod, "fit-example/mod.rds") -->
-<!-- ``` -->
+The approach to analysis of model outputs is to create an output object and then
+call functions to analyse posterior outputs.
 
+```{r, model outputs}
+mod <- list(fit = fit, stand = rakai_stand)
+# mx_out <- add.mx(mod)
 
-<!-- ## Likelihood calculation -->
-
-<!-- 0. A set of parameter inputs -->
-
-<!-- ```{r} -->
-<!-- param <- create.param.list(mod$fit) -->
-<!-- length(param) # number of resamples -->
-<!-- names(param[[13]]) # each has a single sample from joint posterior -->
-
-<!-- p <- param[[13]] -->
-<!-- stand <- mod$stand -->
-<!-- ```  -->
-
-<!-- 1. Construct arrays for rates -->
-
-<!-- * $\lambda(t, a)$: incidence rate by time and age -->
-<!-- * $\mu(t, a)$: non-HIV mortality by time and age -->
-
-<!-- Note: `create.modpred()` is a magic function which illustrates many of these steps in an undocumented way. -->
-
-<!-- ```{r} -->
-<!-- incrateMID_time_age <- exp(stand$Xmid_incrate_time %*% p$coef_incrate_time_age %*% t(stand$Xmid_incrate_age)) -->
-<!-- natmx_time_age <- exp(stand$X_natmx_time %*% p$coef_natmx_time_age %*% t(stand$X_natmx_age)) -->
-<!-- ``` -->
-
-<!-- 2. Calculate cumulative probability of avoiding HIV and survival by cohort -->
-
-<!-- ```{r} -->
-<!-- cumavoid_time_age <- exp(-stand$dt*diagCumSum(incrateMID_time_age)) -->
-<!-- cumavoidMID_time_age <- cumavoid_time_age[1:(stand$STEPS_time-1), 1:(stand$STEPS_age-1)]*exp(-stand$dt/2*incrateMID_time_age) -->
-<!-- natsurv_time_age <- exp(-stand$dt*diagCumSum(exp(stand$Xmid_natmx_time %*% p$coef_natmx_time_age %*% t(stand$Xmid_natmx_age)))) -->
-<!-- ``` -->
+saveRDS(mod, "fit-example/mod.rds")
+```
 
 
-<!-- ```{r} -->
-<!-- m <- create.modpred(p, stand) -->
+## Likelihood calculation
 
-<!-- calc_phivn(37, 52, death = 0, hivpos = 0, m$cumavoid_time_age, m$natsurv_time_age, m$natmx_time_age) -->
+0. A set of parameter inputs
 
-<!-- ## If hivpos = 1, then returns 0 since zero probability that I remained HIV negative -->
-<!-- calc_phivn(37, 52, death = 0, hivpos = 1, m$cumavoid_time_age, m$natsurv_time_age, m$natmx_time_age) -->
-<!-- ``` -->
+```{r}
+mods <- readRDS("~/Downloads/mods_w_twosex_rakai.rds")
+
+# param list for the women's run (index = 2)
+param <- create.param.list(mods[[1]]$fit,ind=2)
+length(param) # number of resamples
+names(param[[13]]) # each has a single sample from joint posterior
+
+p <- param[[13]]
+stand <- mods[[1]]$stand
+```
+
+1. Construct arrays for rates
+
+* $\lambda(t, a)$: incidence rate by time and age
+* $\mu(t, a)$: non-HIV mortality by time and age
+
+Note: `create.modpred()` is a magic function which illustrates many of these steps in an undocumented way.
+
+```{r}
+incrateMID_time_age <- exp(stand$Xmid_incrate_time %*% p$coef_incrate_time_age %*% t(stand$Xmid_incrate_age))
+natmx_time_age <- exp(stand$X_natmx_time %*% p$coef_natmx_time_age %*% t(stand$X_natmx_age))
+
+incid <- calc.incid(p, stand)
+```
+
+2. Calculate cumulative probability of avoiding HIV and survival by cohort
+
+```{r}
+rstan::expose_stan_functions(rstan::stanc("/Users/krisher/Documents/GitHub/mrc-ide/alphaepi/src/stan_files/functions.stan"))
+
+cumavoid_time_age <- exp(-stand$dt*diagCumSum(incrateMID_time_age))
+cumavoidMID_time_age <- cumavoid_time_age[1:(stand$STEPS_time-1), 1:(stand$STEPS_age-26)]*exp(-stand$dt/2*incrateMID_time_age)
+natsurv_time_age <- exp(-stand$dt*diagCumSum(exp(stand$Xmid_natmx_time %*% p$coef_natmx_time_age %*% t(stand$Xmid_natmx_age))))
+```
 
 
-<!-- Function `calc_phivsurv()` calculates the probaility of survival for each time step of exposure. The -->
-<!-- below calculates someone who tested negative at (time, age) = (10, 15), tested positive at  -->
-<!-- (time, age) = (22, 27), and survived to (time, age) = c(32, 37). -->
+```{r}
+m <- create.modpred(p, stand)
 
-<!-- ```{r} -->
+calc_phivn(37, 52, death = 0, hivpos = 0, m$cumavoid_time_age, m$natsurv_time_age, m$natmx_time_age)
 
-<!-- calc_phivsurv(tIDX = 10,       # time step of exposure start (last time known negative) -->
-<!--               aIDX = 15,       # age index of exposure start -->
-<!--               exposeDUR = 12,  # time steps of exposure -->
-<!--               exit_tIDX = 32,  # censor time step -->
-<!--               m$hivsurv_dur_a0,    # array: probability of surviving by duration and age at infection  -->
-<!--               m$hivmxMID_dur_a0,   # array: instantaneous mortality probability at midpoint of time step -->
-<!--               m$artrr_MID,         # vector: reduction in HIV mortality by time step -->
-<!--               stand$artstart_tIDX, # integer: time step when ART starts -->
-<!--               stand$dt)            # real: time step duration -->
-<!-- ``` -->
+## If hivpos = 1, then returns 0 since zero probability that I remained HIV negative
+calc_phivn(37, 52, death = 0, hivpos = 1, m$cumavoid_time_age, m$natsurv_time_age, m$natmx_time_age)
+```
 
-<!-- This has returned a vector of length 12 corresponding to the probability of surving to `t = 32` given  -->
-<!-- infection occurred in time step `s0 = 10:21`, respectively. The vector is increasing because the probability -->
-<!-- I survive to `t = 32` is greater if infection occurred later (shorter duration of infection between `s0` and `t=32`. -->
 
-<!-- The function `calc_phivp()` calculates the probability of surviving to exit time given the relevant exposure interval. -->
-<!-- This integrates the cumulative incidence and survival distributions over the exposure interval. -->
-<!-- ```{r} -->
-<!-- calc_phivp(exit_tIDX = 32, -->
-<!--            exit_aIDX = 37, -->
-<!--            expose_tIDX = 10, -->
-<!--            expose_aIDX = 15, -->
-<!--            expose_DUR = 12,  -->
-<!--            death = 1, -->
-<!--            m$cumavoidMID_time_age, -->
-<!--            m$incrateMID_time_age, -->
-<!--            m$hivsurv_dur_a0,  -->
-<!--            m$hivmx_dur_a0, -->
-<!--            m$hivmxMID_dur_a0, -->
-<!--            m$artrr, -->
-<!--            m$artrr_MID, -->
-<!--            stand$artstart_tIDX,  -->
-<!--            m$natsurv_time_age, -->
-<!--            m$natmx_time_age, -->
-<!--            stand$dt) -->
-<!-- ``` -->
+Function `calc_phivsurv()` calculates the probaility of survival for each time step of exposure. The
+below calculates someone who tested negative at (time, age) = (10, 15), tested positive at
+(time, age) = (22, 27), and survived to (time, age) = c(32, 37).
+
+```{r}
+
+calc_phivsurv(tIDX = 10,       # time step of exposure start (last time known negative)
+              aIDX = 15,       # age index of exposure start
+              exposeDUR = 12,  # time steps of exposure
+              exit_tIDX = 32,  # censor time step
+              m$hivsurv_dur_a0,    # array: probability of surviving by duration and age at infection
+              m$hivmxMID_dur_a0,   # array: instantaneous mortality probability at midpoint of time step
+              m$artrr_MID,         # vector: reduction in HIV mortality by time step
+              stand$artstart_tIDX[1], # integer: time step when ART starts
+              stand$dt)            # real: time step duration
+```
+
+This has returned a vector of length 12 corresponding to the probability of surving to `t = 32` given
+infection occurred in time step `s0 = 10:21`, respectively. The vector is increasing because the probability
+I survive to `t = 32` is greater if infection occurred later (shorter duration of infection between `s0` and `t=32`.
+
+The function `calc_phivp()` calculates the probability of surviving to exit time given the relevant exposure interval.
+This integrates the cumulative incidence and survival distributions over the exposure interval.
+```{r}
+calc_phivp(exit_tIDX = 32,
+           exit_aIDX = 37,
+           expose_tIDX = 10,
+           expose_aIDX = 15,
+           expose_DUR = 12,
+           death = 1,
+           m$cumavoidMID_time_age,
+           m$incrateMID_time_age,
+           m$hivsurv_dur_a0,
+           m$hivmx_dur_a0,
+           m$hivmxMID_dur_a0,
+           m$artrr,
+           m$artrr_MID,
+           stand$artstart_tIDX[1],
+           m$natsurv_time_age,
+           m$natmx_time_age,
+           stand$dt)
+```
